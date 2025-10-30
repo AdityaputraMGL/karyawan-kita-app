@@ -180,7 +180,7 @@ export default function Login() {
         <div
           style={{
             display: "flex",
-            borderBottom: "2px solid #f0f0f0",
+            borderBottom: "2px solid #f0f0f0ff",
             background: "#fafafa",
           }}
         >
@@ -221,7 +221,7 @@ export default function Login() {
                 tab === "register"
                   ? "3px solid #667eea"
                   : "3px solid transparent",
-              color: tab === "register" ? "#667eea" : "#666",
+              color: tab === "register" ? "#667eea" : "#666666ff",
               fontWeight: tab === "register" ? "600" : "400",
               cursor: "pointer",
               fontSize: "14px",
@@ -299,6 +299,8 @@ export default function Login() {
                     fontSize: "14px",
                     transition: "border 0.3s",
                     outline: "none",
+                    background: "white",
+                    color: "#333",
                   }}
                   onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                   onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -329,6 +331,8 @@ export default function Login() {
                     fontSize: "14px",
                     transition: "border 0.3s",
                     outline: "none",
+                    background: "white",
+                    color: "#333",
                   }}
                   onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                   onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -415,6 +419,8 @@ export default function Login() {
                       borderRadius: "8px",
                       fontSize: "14px",
                       outline: "none",
+                      background: "white",
+                      color: "#333",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                     onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -444,6 +450,8 @@ export default function Login() {
                       borderRadius: "8px",
                       fontSize: "14px",
                       outline: "none",
+                      background: "white",
+                      color: "#333",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                     onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -483,6 +491,8 @@ export default function Login() {
                       borderRadius: "8px",
                       fontSize: "14px",
                       outline: "none",
+                      background: "white",
+                      color: "#333",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                     onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -512,6 +522,8 @@ export default function Login() {
                       borderRadius: "8px",
                       fontSize: "14px",
                       outline: "none",
+                      background: "white",
+                      color: "#333",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                     onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -542,13 +554,20 @@ export default function Login() {
                     fontSize: "14px",
                     outline: "none",
                     background: "white",
+                    color: "#333",
                   }}
                   onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                   onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
                 >
-                  <option value="Karyawan">Karyawan</option>
-                  <option value="HR">HR</option>
-                  <option value="Admin">Admin</option>
+                  <option value="Karyawan" style={{ color: "#333" }}>
+                    Karyawan
+                  </option>
+                  <option value="HR" style={{ color: "#333" }}>
+                    HR
+                  </option>
+                  <option value="Admin" style={{ color: "#333" }}>
+                    Admin
+                  </option>
                 </select>
                 <small
                   style={{
@@ -623,6 +642,8 @@ export default function Login() {
                     borderRadius: "8px",
                     fontSize: "14px",
                     outline: "none",
+                    background: "white",
+                    color: "#333",
                   }}
                   onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                   onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -704,6 +725,8 @@ export default function Login() {
                     fontSize: "14px",
                     fontFamily: "monospace",
                     outline: "none",
+                    background: "white",
+                    color: "#333",
                   }}
                   onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                   onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -753,6 +776,8 @@ export default function Login() {
                       borderRadius: "8px",
                       fontSize: "14px",
                       outline: "none",
+                      background: "white",
+                      color: "#333",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                     onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
@@ -782,6 +807,8 @@ export default function Login() {
                       borderRadius: "8px",
                       fontSize: "14px",
                       outline: "none",
+                      background: "white",
+                      color: "#333",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "#667eea")}
                     onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}

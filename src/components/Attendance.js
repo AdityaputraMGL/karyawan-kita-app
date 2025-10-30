@@ -72,6 +72,8 @@ export default function Attendance() {
       jam_pulang: "",
       status: "hadir",
       tipe_kerja: form.tipe_kerja,
+      // ⭐ Tambahkan field role pencatat
+      recorded_by_role: user.role,
     });
 
     alert(`✓ Absen Masuk berhasil pada ${currentTime}`);
@@ -90,6 +92,7 @@ export default function Attendance() {
       now.getMinutes()
     ).padStart(2, "0")}`;
 
+    // Note: Update tidak perlu menambahkan recorded_by_role karena ini kelanjutan dari absen masuk
     api.attendance.update(todayAttendance.attendance_id, {
       jam_pulang: currentTime,
     });
@@ -115,6 +118,8 @@ export default function Attendance() {
     api.attendance.create({
       ...form,
       employee_id: finalEmployeeId,
+      // ⭐ Tambahkan field role pencatat (role yang sedang login, Admin/HR)
+      recorded_by_role: user.role,
     });
 
     setForm({
@@ -369,6 +374,8 @@ export default function Attendance() {
               <th>Pulang</th>
               <th>Status</th>
               <th>Tipe Kerja</th>
+              {/* ⭐ Tampilkan Role Pencatat hanya untuk Admin/HR */}
+              {canSeeAllData && <th>Role Pencatat</th>}
             </tr>
           </thead>
           <tbody>
@@ -395,12 +402,19 @@ export default function Attendance() {
                       {a.tipe_kerja || "WFO"}
                     </span>
                   </td>
+                  {/* ⭐ Tampilkan data Role Pencatat hanya untuk Admin/HR */}
+                  {canSeeAllData && (
+                    <td>
+                      {/* Default ke 'Karyawan' jika data lama/tidak ada role pencatat */}
+                      {a.recorded_by_role || "Karyawan"}
+                    </td>
+                  )}
                 </tr>
               );
             })}
             {list.length === 0 && (
               <tr>
-                <td colSpan="6">
+                <td colSpan={canSeeAllData ? "7" : "6"}>
                   <i>Belum ada catatan absensi.</i>
                 </td>
               </tr>

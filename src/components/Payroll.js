@@ -156,8 +156,17 @@ export default function Payroll() {
 
   const submit = (e) => {
     e.preventDefault();
+
+    // ⭐ PERBAIKAN: Pastikan mengambil role karyawan dari state employees
+    // Gunakan find pada state 'employees' yang sudah di-load di useEffect
+    const employeeData = employees.find(
+      (e) => e.employee_id === form.employee_id
+    );
+    const employeeRole = employeeData?.role || "Karyawan";
+
     api.payroll.create({
       ...form,
+      employee_role: employeeRole,
       total_gaji: calcTotal(),
       alasan_potongan: form.alasan_potongan || "Tidak ada potongan",
     });
@@ -186,6 +195,7 @@ export default function Payroll() {
     const rows = list.map((p) => ({
       employee_id: p.employee_id,
       periode: p.periode,
+      employee_role: p.employee_role || "Karyawan",
       gaji_pokok: p.gaji_pokok,
       tunjangan: p.tunjangan,
       potongan: p.potongan,
@@ -378,6 +388,7 @@ export default function Payroll() {
             <tr>
               <th>Periode</th>
               <th>Nama</th>
+              <th>Role</th>
               <th>Pokok</th>
               <th>Tunjangan</th>
               <th>Potongan</th>
@@ -387,11 +398,17 @@ export default function Payroll() {
           </thead>
           <tbody>
             {list.map((p) => {
-              const emp = api.employees.findById(p.employee_id);
+              // Ganti api.employees.findById(p.employee_id) dengan find dari state employees
+              const emp = employees.find(
+                (e) => e.employee_id === p.employee_id
+              );
               return (
                 <tr key={p.payroll_id}>
                   <td>{p.periode}</td>
-                  <td>{emp?.nama_lengkap}</td>
+                  {/* Gunakan data nama dari state employees yang lebih terjamin */}
+                  <td>{emp?.nama_lengkap || p.employee_id}</td>
+                  {/* Gunakan role yang tersimpan di payroll, atau fallback ke role dari data karyawan */}
+                  <td>{p.employee_role || emp?.role || "-"}</td>
                   <td>Rp {Number(p.gaji_pokok).toLocaleString("id-ID")}</td>
                   <td>Rp {Number(p.tunjangan).toLocaleString("id-ID")}</td>
                   <td style={{ color: p.potongan > 0 ? "#f44336" : "inherit" }}>
@@ -408,7 +425,7 @@ export default function Payroll() {
             })}
             {list.length === 0 && (
               <tr>
-                <td colSpan="7">
+                <td colSpan="8">
                   <i>Belum ada payroll.</i>
                 </td>
               </tr>

@@ -52,6 +52,8 @@ export function seed() {
         jabatan: "Frontend Dev",
         tanggal_masuk: "2024-02-01",
         status_karyawan: "tetap",
+        // ⭐ Ditambahkan: Role untuk Karyawan
+        role: "Karyawan",
       },
       {
         employee_id: "e2",
@@ -62,6 +64,8 @@ export function seed() {
         jabatan: "HR Generalist",
         tanggal_masuk: "2023-06-12",
         status_karyawan: "tetap",
+        // ⭐ Ditambahkan: Role untuk HR
+        role: "HR",
       },
     ]);
   }
@@ -108,6 +112,8 @@ export function register({ username, password, email, role = "Karyawan" }) {
     jabatan: role === "HR" ? "HR" : "Karyawan",
     tanggal_masuk: new Date().toISOString().slice(0, 10),
     status_karyawan: "magang",
+    // ⭐ Ditambahkan: Role karyawan saat register
+    role: role,
   });
   set(LS.employees, emps);
 
@@ -126,6 +132,7 @@ export function register({ username, password, email, role = "Karyawan" }) {
 
 /** === LOGIN === */
 export async function login(username, password) {
+  // ... (tidak ada perubahan di sini)
   const users = get(LS.users);
   const found = users.find(
     (u) => u.username === username && u.password === password
@@ -150,6 +157,7 @@ export function logout() {
 }
 
 /** === FORGOT PASSWORD === */
+// ... (tidak ada perubahan di sini)
 export async function forgotPassword(email) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -189,6 +197,7 @@ export async function forgotPassword(email) {
 }
 
 /** === RESET PASSWORD === */
+// ... (tidak ada perubahan di sini)
 export async function resetPassword(token, newPassword) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -259,7 +268,17 @@ export const employees = {
     );
   },
   findById(id) {
-    return get(LS.employees).find((e) => String(e.employee_id) === String(id));
+    const employee = get(LS.employees).find(
+      (e) => String(e.employee_id) === String(id)
+    );
+    // ⭐ Ambil role dari data users jika role employee belum tersedia
+    if (employee && !employee.role && employee.user_id) {
+      const user = get(LS.users).find((u) => u.user_id === employee.user_id);
+      if (user) {
+        return { ...employee, role: user.role };
+      }
+    }
+    return employee;
   },
   create(payload) {
     const data = get(LS.employees);
@@ -286,6 +305,7 @@ export const employees = {
 
 /* ================= ATTENDANCE ================= */
 export const attendance = {
+  // ... (tidak ada perubahan di sini)
   findAll() {
     return get(LS.attendance).sort((a, b) => (a.tanggal < b.tanggal ? -1 : 1));
   },
@@ -294,8 +314,7 @@ export const attendance = {
     const row = { attendance_id: uid("att"), ...payload };
     data.push(row);
     set(LS.attendance, data);
-  },
-  // METHOD BARU: Update untuk approval status
+  }, // METHOD BARU: Update untuk approval status
   update(id, payload) {
     const data = get(LS.attendance);
     const i = data.findIndex((a) => a.attendance_id === id);
@@ -303,8 +322,7 @@ export const attendance = {
       data[i] = { ...data[i], ...payload };
       set(LS.attendance, data);
     }
-  },
-  // METHOD LAMA (bisa dihapus atau tetap dipertahankan untuk backward compatibility)
+  }, // METHOD LAMA (bisa dihapus atau tetap dipertahankan untuk backward compatibility)
   approve(id, status) {
     const data = get(LS.attendance);
     const i = data.findIndex((a) => a.attendance_id === id);
@@ -316,6 +334,7 @@ export const attendance = {
 };
 
 /* ================= PAYROLL ================= */
+// ... (tidak ada perubahan di sini)
 export const payroll = {
   findAll() {
     return get(LS.payroll).sort((a, b) => (a.periode < b.periode ? 1 : -1));
@@ -329,6 +348,7 @@ export const payroll = {
 };
 
 /* ================= LEAVE ================= */
+// ... (tidak ada perubahan di sini)
 export const leave = {
   findAll() {
     return get(LS.leave).sort((a, b) =>
@@ -352,6 +372,7 @@ export const leave = {
 };
 
 /* ================= PERFORMANCE ================= */
+// ... (tidak ada perubahan di sini)
 export const performance = {
   findAll() {
     return get(LS.performance);
@@ -365,6 +386,7 @@ export const performance = {
 };
 
 /* ================= DASHBOARD STATS ================= */
+// ... (tidak ada perubahan di sini)
 export function stats() {
   const emps = employees.findAll();
   const today = new Date().toISOString().slice(0, 10);

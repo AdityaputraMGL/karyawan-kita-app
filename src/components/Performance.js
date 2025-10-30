@@ -15,6 +15,7 @@ export default function Performance() {
   const currentUser = api.getCurrentUser();
   const isHR = currentUser?.role === "HR";
 
+  // Ambil semua karyawan dan data kinerja
   useEffect(() => {
     setEmployees(api.employees.findAll());
     setList(api.performance.findAll());
@@ -117,17 +118,22 @@ export default function Performance() {
             <tr>
               <th>Periode</th>
               <th>Nama</th>
+              {/* ⭐ Tambahkan kolom Role */}
+              <th>Role</th>
               <th>Nilai</th>
               <th>Catatan</th>
             </tr>
           </thead>
           <tbody>
             {list.map((p) => {
+              // Cari data karyawan menggunakan ID
               const emp = api.employees.findById(p.employee_id);
               return (
                 <tr key={p.performance_id}>
                   <td>{p.periode}</td>
                   <td>{emp?.nama_lengkap}</td>
+                  {/* ⭐ Tampilkan data Role Karyawan */}
+                  <td>{emp?.role || "-"}</td>
                   <td>{p.nilai_kinerja}</td>
                   <td>{p.catatan}</td>
                 </tr>
@@ -135,7 +141,8 @@ export default function Performance() {
             })}
             {list.length === 0 && (
               <tr>
-                <td colSpan="4">
+                {/* Update colspan menjadi 5 */}
+                <td colSpan="5">
                   <i>Belum ada data kinerja.</i>
                 </td>
               </tr>
