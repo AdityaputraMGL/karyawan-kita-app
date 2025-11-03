@@ -50,9 +50,8 @@ export function seed() {
         alamat: "Malang",
         no_hp: "08123",
         jabatan: "Frontend Dev",
-        tanggal_masuk: "2024-02-01",
-        status_karyawan: "tetap",
-        // ⭐ Ditambahkan: Role untuk Karyawan
+        tanggal_masuk: "2024-02-01", // ⭐ PERBAIKAN SEED: Gunakan Title Case agar konsisten dengan form edit
+        status_karyawan: "Tetap",
         role: "Karyawan",
       },
       {
@@ -62,9 +61,8 @@ export function seed() {
         alamat: "Jakarta",
         no_hp: "08111",
         jabatan: "HR Generalist",
-        tanggal_masuk: "2023-06-12",
-        status_karyawan: "tetap",
-        // ⭐ Ditambahkan: Role untuk HR
+        tanggal_masuk: "2023-06-12", // ⭐ PERBAIKAN SEED: Gunakan Title Case agar konsisten dengan form edit
+        status_karyawan: "Tetap",
         role: "HR",
       },
     ]);
@@ -82,7 +80,14 @@ export function getCurrentUser() {
 }
 
 /** === REGISTER === */
-export function register({ username, password, email, role = "Karyawan" }) {
+// ⭐ TERIMA status_karyawan di payload
+export function register({
+  username,
+  password,
+  email,
+  role = "Karyawan",
+  status_karyawan = "Magang", // Nilai default jika tidak ada
+}) {
   const users = get(LS.users);
 
   if (!username || !password)
@@ -110,9 +115,8 @@ export function register({ username, password, email, role = "Karyawan" }) {
     alamat: "",
     no_hp: "",
     jabatan: role === "HR" ? "HR" : "Karyawan",
-    tanggal_masuk: new Date().toISOString().slice(0, 10),
-    status_karyawan: "magang",
-    // ⭐ Ditambahkan: Role karyawan saat register
+    tanggal_masuk: new Date().toISOString().slice(0, 10), // ⭐ PERBAIKAN UTAMA: Gunakan status_karyawan yang diterima dari form
+    status_karyawan: status_karyawan,
     role: role,
   });
   set(LS.employees, emps);
@@ -157,7 +161,6 @@ export function logout() {
 }
 
 /** === FORGOT PASSWORD === */
-// ... (tidak ada perubahan di sini)
 export async function forgotPassword(email) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -197,7 +200,6 @@ export async function forgotPassword(email) {
 }
 
 /** === RESET PASSWORD === */
-// ... (tidak ada perubahan di sini)
 export async function resetPassword(token, newPassword) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -270,8 +272,7 @@ export const employees = {
   findById(id) {
     const employee = get(LS.employees).find(
       (e) => String(e.employee_id) === String(id)
-    );
-    // ⭐ Ambil role dari data users jika role employee belum tersedia
+    ); // Ambil role dari data users jika role employee belum tersedia
     if (employee && !employee.role && employee.user_id) {
       const user = get(LS.users).find((u) => u.user_id === employee.user_id);
       if (user) {
@@ -305,7 +306,6 @@ export const employees = {
 
 /* ================= ATTENDANCE ================= */
 export const attendance = {
-  // ... (tidak ada perubahan di sini)
   findAll() {
     return get(LS.attendance).sort((a, b) => (a.tanggal < b.tanggal ? -1 : 1));
   },
@@ -314,7 +314,7 @@ export const attendance = {
     const row = { attendance_id: uid("att"), ...payload };
     data.push(row);
     set(LS.attendance, data);
-  }, // METHOD BARU: Update untuk approval status
+  },
   update(id, payload) {
     const data = get(LS.attendance);
     const i = data.findIndex((a) => a.attendance_id === id);
@@ -322,7 +322,7 @@ export const attendance = {
       data[i] = { ...data[i], ...payload };
       set(LS.attendance, data);
     }
-  }, // METHOD LAMA (bisa dihapus atau tetap dipertahankan untuk backward compatibility)
+  },
   approve(id, status) {
     const data = get(LS.attendance);
     const i = data.findIndex((a) => a.attendance_id === id);
@@ -334,10 +334,19 @@ export const attendance = {
 };
 
 /* ================= PAYROLL ================= */
-// ... (tidak ada perubahan di sini)
 export const payroll = {
   findAll() {
     return get(LS.payroll).sort((a, b) => (a.periode < b.periode ? 1 : -1));
+  },
+  /**
+   * FUNGSI BARU: Membersihkan data payroll yang tidak valid (Pokok/Total terlalu kecil).
+   * Digunakan di Payroll.jsx sebelum setList.
+   */ cleanData(payrollList) {
+    return payrollList.filter((p) => {
+      const gajiPokok = Number(p.gaji_pokok);
+      const totalGaji = Number(p.total_gaji);
+      return gajiPokok > 1000 && totalGaji > 1000;
+    });
   },
   create(payload) {
     const data = get(LS.payroll);
@@ -348,7 +357,6 @@ export const payroll = {
 };
 
 /* ================= LEAVE ================= */
-// ... (tidak ada perubahan di sini)
 export const leave = {
   findAll() {
     return get(LS.leave).sort((a, b) =>
@@ -372,7 +380,6 @@ export const leave = {
 };
 
 /* ================= PERFORMANCE ================= */
-// ... (tidak ada perubahan di sini)
 export const performance = {
   findAll() {
     return get(LS.performance);
@@ -386,7 +393,6 @@ export const performance = {
 };
 
 /* ================= DASHBOARD STATS ================= */
-// ... (tidak ada perubahan di sini)
 export function stats() {
   const emps = employees.findAll();
   const today = new Date().toISOString().slice(0, 10);
@@ -394,11 +400,14 @@ export function stats() {
   const izin = atts.filter((a) => a.status !== "hadir").length;
   const cutiPending = leave
     .findAll()
-    .filter((l) => l.status === "pending").length;
-  const period = new Date().toISOString().slice(0, 7);
-  const gajiBulanIni = payroll
+    .filter((l) => l.status === "pending").length; // ⭐ PERBAIKAN UTAMA: Ambil data payroll HANYA untuk bulan saat ini
+  const currentPeriod = new Date().toISOString().slice(0, 7);
+  const currentMonthPayroll = payroll
     .findAll()
-    .filter((p) => p.periode === period)
+    .filter((p) => p.periode === currentPeriod); // ⭐ PERBAIKAN UTAMA: Hitung total gaji dari data valid bulan ini
+
+  const gajiBulanIni = currentMonthPayroll
+    .filter((p) => Number(p.gaji_pokok) > 1000 && Number(p.total_gaji) > 1000)
     .reduce((s, p) => s + Number(p.total_gaji || 0), 0);
 
   return {

@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react";
+// Import useNavigate jika Anda menggunakan tombol Quick Actions
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+// Asumsi api.attendance, api.leave, api.employees sudah tersedia
 import * as api from "../services/api";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate(); // Inisialisasi useNavigate
+
   const [stats, setStats] = useState({
     totalHadir: 0,
     totalCuti: 0,
-    sisaCuti: 12, // Asumsi jatah cuti per tahun
+    sisaCuti: 12,
     cutiDigunakan: 0,
     pendingApproval: 0,
     recentAttendance: [],
     recentLeave: [],
     upcomingLeave: [],
-    totalKaryawan: 0,
-    pendingLeaveApproval: 0,
-    pendingAttendanceApproval: 0,
   });
 
   const loggedInEmployeeId = user.employee_id || user.username;
@@ -25,14 +27,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     calculateStats();
-  }, []);
+    // Tambahkan dependencies yang relevan
+  }, [user.role, loggedInEmployeeId]);
 
   const calculateStats = () => {
     // Ambil data absensi dan cuti
     const allAttendance = api.attendance.findAll();
     const allLeave = api.leave.findAll();
 
-    // Filter data untuk user yang login (kecuali Admin/HR yang bisa lihat semua)
+    // Data untuk user yang login
     const myAttendance = allAttendance.filter(
       (a) => a.employee_id === loggedInEmployeeId
     );
@@ -40,10 +43,8 @@ export default function Dashboard() {
       (l) => l.employee_id === loggedInEmployeeId
     );
 
-    // Hitung statistik absensi
     const totalHadir = myAttendance.filter((a) => a.status === "hadir").length;
 
-    // Hitung statistik cuti
     const approvedLeave = myLeave.filter(
       (l) => l.status === "approved" && l.jenis_pengajuan === "Cuti"
     );
@@ -53,6 +54,7 @@ export default function Dashboard() {
     // Pending approval (absensi WFH/Hybrid + cuti pending)
     const pendingAttendance = myAttendance.filter(
       (a) =>
+        // Asumsi ada field 'needs_approval' atau status khusus
         a.status_approval === "pending" &&
         (a.tipe_kerja === "WFH" || a.tipe_kerja === "Hybrid")
     ).length;
@@ -80,7 +82,6 @@ export default function Dashboard() {
       .sort((a, b) => new Date(a.tanggal_mulai) - new Date(b.tanggal_mulai))
       .slice(0, 3);
 
-    // Update state
     setStats({
       totalHadir,
       totalCuti: myLeave.length,
@@ -93,7 +94,6 @@ export default function Dashboard() {
     });
   };
 
-  // Fungsi untuk mendapatkan greeting berdasarkan waktu
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Selamat Pagi";
@@ -102,28 +102,126 @@ export default function Dashboard() {
     return "Selamat Malam";
   };
 
-  // Fungsi untuk format tanggal
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const options = { day: "numeric", month: "short", year: "numeric" };
     return new Date(dateString).toLocaleDateString("id-ID", options);
   };
 
+  // --- INLINE STYLES YANG DIRAPIKAN ---
+  const styles = {
+    mainContainer: { padding: "2rem 1.5rem 1.5rem 1.5rem" },
+
+    // Header Style (Warna Solid sesuai tema gelap)
+    headerCard: {
+      backgroundColor: "#3A4068",
+      color: "white",
+      borderRadius: "12px",
+      padding: "1.5rem",
+      marginBottom: "2rem",
+    },
+    greeting: {
+      fontSize: "2.2rem",
+      fontWeight: "700",
+      margin: "0 0 0.25rem 0",
+    },
+    subtitle: { fontSize: "1rem", margin: 0, opacity: 0.8 },
+
+    // Grid untuk Kartu (4 kolom)
+    statsGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(4, 1fr)",
+      gap: "1.2rem",
+      marginBottom: "2rem",
+    },
+    // Style Kartu Default
+    statCard: (color) => ({
+      backgroundColor: color,
+      borderRadius: "12px",
+      padding: "1.5rem",
+      color: "white",
+      textAlign: "center",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+    }),
+    cardValue: {
+      fontSize: "3.5rem",
+      fontWeight: "bold",
+      lineHeight: 1,
+      marginBottom: "0.25rem",
+    },
+    cardTitle: { fontSize: "1rem", opacity: 0.9 },
+
+    // Quick Actions
+    actionsHeader: {
+      fontSize: "1.5rem",
+      fontWeight: "600",
+      color: "#fff",
+      margin: "0 0 1rem 0",
+    },
+    actionsGrid: { display: "flex", gap: "1.5rem", marginBottom: "2rem" },
+    actionButton: (color) => ({
+      flex: 1,
+      padding: "1.5rem",
+      borderRadius: "12px",
+      backgroundColor: color,
+      color: "white",
+      fontSize: "1.1rem",
+      fontWeight: "600",
+      cursor: "pointer",
+      textAlign: "center",
+      border: "none",
+      transition: "opacity 0.2s",
+    }),
+
+    // Bagian Bawah (2 Kolom)
+    bottomGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(2, 1fr)",
+      gap: "1.5rem",
+    },
+    tableHeader: {
+      fontSize: "1.2rem",
+      fontWeight: "600",
+      color: "#fff",
+      margin: "0 0 1rem 0",
+    },
+    tableCard: {
+      backgroundColor: "#2C3150",
+      borderRadius: "12px",
+      padding: "0",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+      overflow: "hidden", // Penting untuk tabel
+    },
+    table: {
+      width: "100%",
+      borderCollapse: "collapse",
+      color: "white",
+    },
+    th: {
+      padding: "0.8rem 1.2rem",
+      fontSize: "0.85rem",
+      fontWeight: "600",
+      color: "rgba(255, 255, 255, 0.8)",
+      textAlign: "left",
+      backgroundColor: "#3A4068",
+    },
+    td: {
+      padding: "0.8rem 1.2rem",
+      fontSize: "0.85rem",
+      borderBottom: "1px solid #3A4068",
+      whiteSpace: "nowrap",
+    },
+  };
+  // --- END INLINE STYLES ---
+
   return (
-    <div>
-      {/* Header Welcome */}
-      <div
-        className="card"
-        style={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          color: "white",
-          marginBottom: "2rem",
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: "28px" }}>
+    <div style={styles.mainContainer}>
+      {/* Header Welcome (Rapi) */}
+      <div style={styles.headerCard}>
+        <h2 style={styles.greeting}>
           {getGreeting()}, {user.nama_lengkap || user.username}! 👋
         </h2>
-        <p style={{ margin: "0.5rem 0 0 0", opacity: 0.9 }}>
+        <p style={styles.subtitle}>
           {isAdmin
             ? "Anda login sebagai Admin - Kelola sistem HR dengan bijak"
             : isHR
@@ -132,363 +230,258 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Statistik Cards - Hanya untuk Karyawan dan HR */}
-      {!isAdmin && (
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "1rem",
-            marginBottom: "2rem",
-          }}
-        >
-          {/* Card Total Kehadiran */}
-          <div
-            className="card"
-            style={{
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              color: "white",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: "48px", fontWeight: "bold" }}>
-              {stats.totalHadir}
-            </div>
-            <div style={{ opacity: 0.9 }}>Total Kehadiran</div>
-          </div>
+      {/* Statistik Cards (Rapi) */}
+      <div style={styles.statsGrid}>
+        {/* Total Kehadiran */}
+        <div style={styles.statCard("#5C54A4")}>
+          <div style={styles.cardValue}>{stats.totalHadir}</div>
+          <div style={styles.cardTitle}>Total Kehadiran</div>
+        </div>
 
-          {/* Card Sisa Cuti */}
-          <div
-            className="card"
-            style={{
-              background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-              color: "white",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: "48px", fontWeight: "bold" }}>
-              {stats.sisaCuti}
-            </div>
-            <div style={{ opacity: 0.9 }}>
-              Sisa Cuti ({stats.cutiDigunakan} digunakan)
-            </div>
-          </div>
-
-          {/* Card Pending Approval */}
-          <div
-            className="card"
-            style={{
-              background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-              color: "white",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: "48px", fontWeight: "bold" }}>
-              {stats.pendingApproval}
-            </div>
-            <div style={{ opacity: 0.9 }}>Menunggu Approval</div>
-          </div>
-
-          {/* Card Total Pengajuan */}
-          <div
-            className="card"
-            style={{
-              background: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-              color: "white",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: "48px", fontWeight: "bold" }}>
-              {stats.totalCuti}
-            </div>
-            <div style={{ opacity: 0.9 }}>Total Pengajuan Cuti</div>
+        {/* Sisa Cuti */}
+        <div style={styles.statCard("#FF6384")}>
+          <div style={styles.cardValue}>{stats.sisaCuti}</div>
+          <div style={styles.cardTitle}>
+            Sisa Cuti ({stats.cutiDigunakan} digunakan)
           </div>
         </div>
-      )}
 
-      {/* Quick Actions */}
-      <div className="card" style={{ marginBottom: "2rem" }}>
-        <h3 style={{ marginTop: 0 }}>⚡ Quick Actions</h3>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "1rem",
-          }}
-        >
-          {!isAdmin && (
-            <>
-              <button
-                className="btn"
-                onClick={() => (window.location.href = "/attendance")}
-                style={{
-                  padding: "1rem",
-                  background: "#667eea",
-                  color: "white",
-                  border: "none",
-                  fontSize: "16px",
-                }}
-              >
-                📝 Catat Absensi
-              </button>
-              <button
-                className="btn"
-                onClick={() => (window.location.href = "/leave")}
-                style={{
-                  padding: "1rem",
-                  background: "#f5576c",
-                  color: "white",
-                  border: "none",
-                  fontSize: "16px",
-                }}
-              >
-                ✈️ Ajukan Cuti/Izin
-              </button>
-            </>
-          )}
-          {(isAdmin || isHR) && (
-            <>
-              <button
-                className="btn"
-                onClick={() => (window.location.href = "/attendance")}
-                style={{
-                  padding: "1rem",
-                  background: "#43e97b",
-                  color: "white",
-                  border: "none",
-                  fontSize: "16px",
-                }}
-              >
-                👥 Kelola Absensi
-              </button>
-              <button
-                className="btn"
-                onClick={() => (window.location.href = "/leave")}
-                style={{
-                  padding: "1rem",
-                  background: "#4facfe",
-                  color: "white",
-                  border: "none",
-                  fontSize: "16px",
-                }}
-              >
-                📋 Kelola Cuti
-              </button>
-            </>
-          )}
+        {/* Pending Approval */}
+        <div style={styles.statCard("#4facfe")}>
+          <div style={styles.cardValue}>{stats.pendingApproval}</div>
+          <div style={styles.cardTitle}>Menunggu Approval</div>
+        </div>
+
+        {/* Total Pengajuan */}
+        <div style={styles.statCard("#3CB371")}>
+          <div style={styles.cardValue}>{stats.totalCuti}</div>
+          <div style={styles.cardTitle}>Total Pengajuan Cuti</div>
         </div>
       </div>
 
-      {/* Upcoming Leave - Hanya untuk Karyawan dan HR */}
-      {!isAdmin && stats.upcomingLeave.length > 0 && (
-        <div className="card" style={{ marginBottom: "2rem" }}>
-          <h3 style={{ marginTop: 0 }}>📅 Cuti Yang Akan Datang</h3>
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
-          >
-            {stats.upcomingLeave.map((leave) => (
-              <div
-                key={leave.leave_id}
-                style={{
-                  padding: "1rem",
-                  background: "#e8f5e9",
-                  borderRadius: "8px",
-                  borderLeft: "4px solid #4caf50",
-                }}
-              >
-                <div style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>
-                  {leave.jenis_pengajuan || "Cuti"}
-                </div>
-                <div style={{ color: "#666", fontSize: "14px" }}>
-                  📆 {formatDate(leave.tanggal_mulai)} s/d{" "}
-                  {formatDate(leave.tanggal_selesai)}
-                </div>
-                <div
-                  style={{
-                    color: "#666",
-                    fontSize: "14px",
-                    marginTop: "0.25rem",
-                  }}
-                >
-                  💬 {leave.alasan}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Activity */}
-      <div
-        className="grid"
-        style={{
-          gridTemplateColumns: isAdmin
-            ? "1fr"
-            : "repeat(auto-fit, minmax(400px, 1fr))",
-          gap: "1rem",
-        }}
-      >
-        {/* Recent Attendance - Hanya untuk Karyawan dan HR */}
+      {/* Quick Actions (Rapi) */}
+      <h3 style={styles.actionsHeader}>⚡ Quick Actions</h3>
+      <div style={styles.actionsGrid}>
+        {/* Tombol untuk Karyawan/HR (Ajukan Cuti & Catat Absensi) */}
         {!isAdmin && (
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>🕐 Absensi Terbaru</h3>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Masuk</th>
-                  <th>Pulang</th>
-                  <th>Tipe</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recentAttendance.length > 0 ? (
-                  stats.recentAttendance.map((a) => (
-                    <tr key={a.attendance_id}>
-                      <td>{formatDate(a.tanggal)}</td>
-                      <td>{a.jam_masuk || "-"}</td>
-                      <td>{a.jam_pulang || "-"}</td>
-                      <td>
-                        <span
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            fontSize: "12px",
-                            background:
-                              a.tipe_kerja === "WFO"
-                                ? "#e3f2fd"
-                                : a.tipe_kerja === "WFH"
-                                ? "#fff3e0"
-                                : "#f3e5f5",
-                            color:
-                              a.tipe_kerja === "WFO"
-                                ? "#1976d2"
-                                : a.tipe_kerja === "WFH"
-                                ? "#f57c00"
-                                : "#7b1fa2",
-                          }}
-                        >
-                          {a.tipe_kerja || "WFO"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4">
-                      <i>Belum ada data absensi</i>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <button
+              style={styles.actionButton("#5C54A4")}
+              onClick={() => navigate("/attendance")}
+            >
+              📝 Catat Absensi
+            </button>
+            <button
+              style={styles.actionButton("#FF6347")}
+              onClick={() => navigate("/leave")}
+            >
+              ✈️ Ajukan Cuti/Izin
+            </button>
+          </>
         )}
 
-        {/* Recent Leave - Hanya untuk Karyawan dan HR */}
-        {!isAdmin && (
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>📋 Pengajuan Terbaru</h3>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Jenis</th>
-                  <th>Periode</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recentLeave.length > 0 ? (
-                  stats.recentLeave.map((l) => (
-                    <tr key={l.leave_id}>
-                      <td>{formatDate(l.tanggal_pengajuan)}</td>
-                      <td>{l.jenis_pengajuan || "Cuti"}</td>
-                      <td style={{ fontSize: "12px" }}>
-                        {formatDate(l.tanggal_mulai)} →{" "}
-                        {formatDate(l.tanggal_selesai)}
-                      </td>
-                      <td>
-                        <span
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            fontSize: "12px",
-                            fontWeight: "500",
-                            background:
-                              l.status === "approved"
-                                ? "#4caf50"
-                                : l.status === "rejected"
-                                ? "#f44336"
-                                : "#ff9800",
-                            color: "white",
-                          }}
-                        >
-                          {l.status === "approved"
-                            ? "✓ Approved"
-                            : l.status === "rejected"
-                            ? "✗ Rejected"
-                            : "⏳ Pending"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4">
-                      <i>Belum ada pengajuan</i>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Info untuk Admin */}
-        {isAdmin && (
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>ℹ️ Informasi Admin</h3>
-            <div style={{ lineHeight: "1.8" }}>
-              <p>
-                Selamat datang di dashboard Admin. Sebagai Admin, Anda memiliki
-                akses penuh untuk:
-              </p>
-              <ul style={{ paddingLeft: "1.5rem" }}>
-                <li>✓ Melihat dan mengelola semua data absensi karyawan</li>
-                <li>✓ Melihat dan menyetujui/menolak pengajuan cuti/izin</li>
-                <li>✓ Mengelola data karyawan</li>
-                <li>⚠️ Tidak dapat mengajukan cuti/izin atas nama sendiri</li>
-              </ul>
-              <div
-                style={{
-                  marginTop: "1rem",
-                  padding: "1rem",
-                  background: "#fff3e0",
-                  borderRadius: "8px",
-                  borderLeft: "4px solid #ff9800",
-                }}
-              >
-                <strong>💡 Tips:</strong> Gunakan menu Absensi dan Cuti untuk
-                mengelola pengajuan karyawan yang memerlukan approval.
-              </div>
-            </div>
-          </div>
+        {/* Tombol untuk HR/Admin (Kelola) */}
+        {(isAdmin || isHR) && (
+          <>
+            <button
+              style={styles.actionButton("#43e97b")}
+              onClick={() => navigate("/attendance")}
+            >
+              👥 Kelola Absensi
+            </button>
+            <button
+              style={styles.actionButton("#4facfe")}
+              onClick={() => navigate("/leave")}
+            >
+              📋 Kelola Cuti
+            </button>
+          </>
         )}
       </div>
 
-      {/* Footer Info */}
+      {/* Bagian Bawah: Cuti Yang Akan Datang & Pengajuan Terbaru */}
+      <div style={styles.bottomGrid}>
+        {/* Box Kiri: Cuti Yang Akan Datang */}
+        {!isAdmin && (
+          <div>
+            <h3 style={styles.tableHeader}>📅 Cuti Yang Akan Datang</h3>
+            <div style={styles.tableCard}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Jenis</th>
+                    <th style={styles.th}>Periode</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.upcomingLeave.length > 0 ? (
+                    stats.upcomingLeave.map((l, index) => (
+                      <tr key={l.leave_id}>
+                        <td style={styles.td}>{l.jenis_pengajuan}</td>
+                        <td style={styles.td}>
+                          {formatDate(l.tanggal_mulai)} s/d{" "}
+                          {formatDate(l.tanggal_selesai)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan="2"
+                        style={{
+                          ...styles.td,
+                          textAlign: "center",
+                          color: "rgba(255, 255, 255, 0.6)",
+                          borderBottom: "none",
+                        }}
+                      >
+                        Tidak ada cuti/izin yang akan datang.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Box Kanan: Pengajuan Terbaru (untuk HR/Admin) atau Absensi Terbaru (untuk Karyawan) */}
+        <div style={{ gridColumn: isAdmin ? "1 / -1" : "auto" }}>
+          <h3 style={styles.tableHeader}>
+            {isAdmin || isHR ? "📋 Pengajuan Terbaru" : "🕐 Absensi Terbaru"}
+          </h3>
+
+          <div style={styles.tableCard}>
+            {/* Tampilkan tabel Pengajuan Terbaru (Cuti/Izin) untuk Admin/HR */}
+            {(isAdmin || isHR) && (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Tanggal</th>
+                    <th style={styles.th}>Jenis</th>
+                    <th style={styles.th}>Periode</th>
+                    <th style={styles.th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recentLeave.length > 0 ? (
+                    stats.recentLeave.map((l) => (
+                      <tr key={l.leave_id}>
+                        <td style={styles.td}>
+                          {formatDate(l.tanggal_pengajuan)}
+                        </td>
+                        <td style={styles.td}>{l.jenis_pengajuan || "Cuti"}</td>
+                        <td style={styles.td}>
+                          {formatDate(l.tanggal_mulai)} →{" "}
+                          {formatDate(l.tanggal_selesai)}
+                        </td>
+                        <td style={styles.td}>
+                          <span
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: "4px",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              background:
+                                l.status === "approved"
+                                  ? "#4caf50"
+                                  : l.status === "rejected"
+                                  ? "#f44336"
+                                  : "#ff9800",
+                              color: "white",
+                            }}
+                          >
+                            {l.status === "approved"
+                              ? "✓ Approved"
+                              : l.status === "rejected"
+                              ? "✗ Rejected"
+                              : "⏳ Pending"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan="4"
+                        style={{
+                          ...styles.td,
+                          textAlign: "center",
+                          color: "rgba(255, 255, 255, 0.6)",
+                          borderBottom: "none",
+                        }}
+                      >
+                        Belum ada pengajuan cuti/izin terbaru.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+
+            {/* Tampilkan tabel Absensi Terbaru HANYA untuk Karyawan biasa */}
+            {isEmployee && (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Tanggal</th>
+                    <th style={styles.th}>Masuk</th>
+                    <th style={styles.th}>Pulang</th>
+                    <th style={styles.th}>Tipe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recentAttendance.length > 0 ? (
+                    stats.recentAttendance.map((a) => (
+                      <tr key={a.attendance_id}>
+                        <td style={styles.td}>{formatDate(a.tanggal)}</td>
+                        <td style={styles.td}>{a.jam_masuk || "-"}</td>
+                        <td style={styles.td}>{a.jam_pulang || "-"}</td>
+                        <td style={styles.td}>{a.tipe_kerja || "WFO"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan="4"
+                        style={{
+                          ...styles.td,
+                          textAlign: "center",
+                          color: "rgba(255, 255, 255, 0.6)",
+                          borderBottom: "none",
+                        }}
+                      >
+                        Belum ada data absensi.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Info (Tetap rapi) */}
       <div
-        className="card"
         style={{
+          ...styles.card,
           marginTop: "2rem",
-          background: "#f5f5f5",
+          background: "#3A4068",
           textAlign: "center",
+          padding: "1rem",
+          border: "1px solid #5C54A4",
         }}
       >
-        <p style={{ margin: 0, color: "#666", fontSize: "14px" }}>
+        <p
+          style={{
+            margin: 0,
+            color: "rgba(255, 255, 255, 0.7)",
+            fontSize: "14px",
+          }}
+        >
           💼 HR Platform - Sistem Manajemen Karyawan | Role:{" "}
-          <strong>{user.role}</strong>
+          <strong style={{ color: "#fff" }}>{user.role}</strong>
         </p>
       </div>
     </div>

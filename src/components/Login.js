@@ -10,25 +10,21 @@ export default function Login() {
   const navigate = useNavigate();
   const { login, register, forgotPassword, resetPassword } = useAuth();
 
-  // state login
   const [username, setU] = useState("");
   const [password, setP] = useState("");
-
-  // state register
   const [rUsername, setRU] = useState("");
   const [rEmail, setRE] = useState("");
   const [rPass, setRP] = useState("");
   const [rPass2, setRP2] = useState("");
   const [rRole, setRRole] = useState("Karyawan");
+  const [rStatusKaryawan, setRStatusKaryawan] = useState("Magang");
 
-  // state forget password
   const [forgotEmail, setForgotEmail] = useState("");
-
-  // state reset password
   const [resetToken, setResetToken] = useState("");
   const [newPass, setNewPass] = useState("");
   const [newPass2, setNewPass2] = useState("");
 
+  // --- FUNGSI LOGIN/REGISTER/ETC ---
   const onLogin = async (e) => {
     e.preventDefault();
     setErr("");
@@ -57,6 +53,7 @@ export default function Login() {
         password: rPass,
         email: rEmail.trim(),
         role: rRole,
+        status_karyawan: rStatusKaryawan,
       });
       navigate("/dashboard");
     } catch (e) {
@@ -120,59 +117,223 @@ export default function Login() {
     }
   };
 
+  // ------------------------------------------------------------------
+  // INLINE STYLES
+  // ------------------------------------------------------------------
+  const INPUT_STYLE = {
+    width: "100%",
+    padding: "16px 20px",
+    border: "1px solid #e0e0e0",
+    borderRadius: "10px",
+    fontSize: "15px",
+    transition: "all 0.3s ease",
+    outline: "none",
+    background: "white",
+    color: "#333",
+    boxSizing: "border-box",
+  };
+
+  const BUTTON_SUBMIT_STYLE = (disabled) => ({
+    width: "100%",
+    padding: "18px",
+    background: disabled
+      ? "#ccc"
+      : "linear-gradient(135deg, #5C54A4 0%, #764ba2 100%)",
+    color: "white",
+    border: "none",
+    borderRadius: "10px",
+    fontSize: "17px",
+    fontWeight: "600",
+    cursor: disabled ? "not-allowed" : "pointer",
+    transition: "all 0.3s ease",
+    boxShadow: disabled ? "none" : "0 4px 12px rgba(92, 84, 164, 0.3)",
+  });
+
+  const styles = {
+    label: {
+      display: "block",
+      marginBottom: "8px",
+      color: "#555",
+      fontWeight: "500",
+      fontSize: "14px",
+    },
+    twoColumnGrid: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "20px",
+    },
+    formElement: {
+      display: "flex",
+      flexDirection: "column",
+    },
+    paragraph: {
+      margin: "0 0 8px 0",
+      color: "#666",
+      fontSize: "14px",
+      lineHeight: "1.5",
+    },
+    successText: {
+      color: "#4caf50",
+      fontSize: "12px",
+      marginTop: "4px",
+      display: "block",
+    },
+    helpText: {
+      color: "#888",
+      fontSize: "11px",
+      marginTop: "4px",
+      display: "block",
+    },
+    linkButton: {
+      color: "#5C54A4",
+      background: "none",
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      textDecoration: "underline",
+      fontSize: "13px",
+      fontWeight: "500",
+    },
+    errorMessage: {
+      padding: "14px 18px",
+      background: "#fef0f0",
+      border: "1px solid #fcc",
+      borderRadius: "10px",
+      color: "#c33",
+      marginBottom: "20px",
+      fontSize: "14px",
+    },
+    successMessage: {
+      padding: "14px 18px",
+      background: "#f0fef0",
+      border: "1px solid #cfc",
+      borderRadius: "10px",
+      color: "#373",
+      marginBottom: "20px",
+      fontSize: "14px",
+    },
+  };
+
+  // SVG Logo HRIS Component
+  const HRISLogo = () => (
+    <svg
+      width="70"
+      height="70"
+      viewBox="0 0 70 70"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ margin: "0 auto 16px" }}
+    >
+      {/* Background Circle */}
+      <circle cx="35" cy="35" r="33" fill="rgba(255,255,255,0.15)" />
+
+      {/* People Icon - Left Person */}
+      <circle cx="24" cy="26" r="5" fill="white" opacity="0.9" />
+      <path
+        d="M24 33C19 33 16 35 16 38V42H32V38C32 35 29 33 24 33Z"
+        fill="white"
+        opacity="0.9"
+      />
+
+      {/* People Icon - Right Person */}
+      <circle cx="46" cy="26" r="5" fill="white" opacity="0.9" />
+      <path
+        d="M46 33C41 33 38 35 38 38V42H54V38C54 35 51 33 46 33Z"
+        fill="white"
+        opacity="0.9"
+      />
+
+      {/* Document/System Icon */}
+      <rect
+        x="26"
+        y="46"
+        width="18"
+        height="14"
+        rx="2"
+        fill="white"
+        opacity="0.9"
+      />
+      <line
+        x1="29"
+        y1="50"
+        x2="41"
+        y2="50"
+        stroke="#5C54A4"
+        strokeWidth="1.5"
+      />
+      <line
+        x1="29"
+        y1="53"
+        x2="38"
+        y2="53"
+        stroke="#5C54A4"
+        strokeWidth="1.5"
+      />
+      <line
+        x1="29"
+        y1="56"
+        x2="41"
+        y2="56"
+        stroke="#5C54A4"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+
   return (
     <div
       style={{
         minHeight: "100vh",
+        height: "100%",
+        width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         padding: "20px",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: "auto",
       }}
     >
       <div
         style={{
           width: "100%",
-          maxWidth: "480px",
+          maxWidth: "900px",
           background: "white",
-          borderRadius: "16px",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          borderRadius: "20px",
+          boxShadow: "0 25px 80px rgba(0,0,0,0.35)",
           overflow: "hidden",
+          display: "grid",
+          gridTemplateColumns: "1fr",
+          margin: "auto",
         }}
       >
-        {/* Header */}
+        {/* Header dengan Logo HRIS */}
         <div
           style={{
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            padding: "40px 32px",
+            background: "linear-gradient(135deg, #5C54A4 0%, #764ba2 100%)",
+            padding: "48px 40px",
             textAlign: "center",
             color: "white",
           }}
         >
-          <div
+          <HRISLogo />
+          <h2
             style={{
-              width: "64px",
-              height: "64px",
-              background: "rgba(255,255,255,0.2)",
-              borderRadius: "50%",
-              margin: "0 auto 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              margin: "0 0 8px 0",
               fontSize: "32px",
-              fontWeight: "bold",
+              fontWeight: "700",
+              letterSpacing: "-0.5px",
             }}
           >
-            HR
-          </div>
-          <h2
-            style={{ margin: "0 0 8px 0", fontSize: "28px", fontWeight: "600" }}
-          >
-            Sistem HR Management
+            HRIS Management
           </h2>
-          <p style={{ margin: 0, opacity: 0.9, fontSize: "14px" }}>
-            Kelola karyawan dan kehadiran dengan mudah
+          <p style={{ margin: 0, opacity: 0.9, fontSize: "16px" }}>
+            Human Resource Information System
           </p>
         </div>
 
@@ -180,8 +341,8 @@ export default function Login() {
         <div
           style={{
             display: "flex",
-            borderBottom: "2px solid #f0f0f0ff",
             background: "#fafafa",
+            borderBottom: "1px solid #eee",
           }}
         >
           <button
@@ -196,9 +357,9 @@ export default function Login() {
               border: "none",
               background: tab === "login" ? "white" : "transparent",
               borderBottom:
-                tab === "login" ? "3px solid #667eea" : "3px solid transparent",
-              color: tab === "login" ? "#667eea" : "#666",
-              fontWeight: tab === "login" ? "600" : "400",
+                tab === "login" ? "2px solid #5C54A4" : "2px solid transparent",
+              color: tab === "login" ? "#5C54A4" : "#999",
+              fontWeight: tab === "login" ? "600" : "500",
               cursor: "pointer",
               fontSize: "14px",
               transition: "all 0.3s",
@@ -214,15 +375,15 @@ export default function Login() {
             }}
             style={{
               flex: 1,
-              padding: "16px",
+              padding: "14px",
               border: "none",
               background: tab === "register" ? "white" : "transparent",
               borderBottom:
                 tab === "register"
-                  ? "3px solid #667eea"
-                  : "3px solid transparent",
-              color: tab === "register" ? "#667eea" : "#666666ff",
-              fontWeight: tab === "register" ? "600" : "400",
+                  ? "2px solid #5C54A4"
+                  : "2px solid transparent",
+              color: tab === "register" ? "#5C54A4" : "#999",
+              fontWeight: tab === "register" ? "600" : "500",
               cursor: "pointer",
               fontSize: "14px",
               transition: "all 0.3s",
@@ -233,152 +394,89 @@ export default function Login() {
         </div>
 
         {/* Content */}
-        <div style={{ padding: "32px" }}>
+        <div style={{ padding: "48px 80px 56px" }}>
           {/* Error Message */}
-          {err && (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: "#fee",
-                border: "1px solid #fcc",
-                borderRadius: "8px",
-                color: "#c33",
-                marginBottom: "20px",
-                fontSize: "14px",
-              }}
-            >
-              ⚠️ {err}
-            </div>
-          )}
-
+          {err && <div style={styles.errorMessage}>⚠️ {err}</div>}
           {/* Success Message */}
-          {success && (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: "#efe",
-                border: "1px solid #cfc",
-                borderRadius: "8px",
-                color: "#373",
-                marginBottom: "20px",
-                fontSize: "14px",
-              }}
-            >
-              ✓ {success}
-            </div>
-          )}
+          {success && <div style={styles.successMessage}>✓ {success}</div>}
 
           {/* LOGIN FORM */}
           {tab === "login" && (
             <form
               onSubmit={onLogin}
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
             >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    color: "#333",
-                    fontWeight: "500",
-                    fontSize: "14px",
-                  }}
-                >
-                  Username
-                </label>
+              <div style={styles.formElement}>
+                <label style={styles.label}>Username</label>
                 <input
                   value={username}
                   onChange={(e) => setU(e.target.value)}
                   required
                   autoFocus
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    transition: "border 0.3s",
-                    outline: "none",
-                    background: "white",
-                    color: "#333",
+                  placeholder="Masukkan username"
+                  style={INPUT_STYLE}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#5C54A4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(92, 84, 164, 0.1)";
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                  onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#e0e0e0";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
               </div>
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    color: "#333",
-                    fontWeight: "500",
-                    fontSize: "14px",
-                  }}
-                >
-                  Password
-                </label>
+              <div style={styles.formElement}>
+                <label style={styles.label}>Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setP(e.target.value)}
                   required
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    transition: "border 0.3s",
-                    outline: "none",
-                    background: "white",
-                    color: "#333",
+                  placeholder="Masukkan password"
+                  style={INPUT_STYLE}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#5C54A4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(92, 84, 164, 0.1)";
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                  onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#e0e0e0";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
               </div>
-              <button
-                type="submit"
-                disabled={loading}
+
+              <div
                 style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: loading
-                    ? "#ccc"
-                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  transition: "transform 0.2s",
-                  marginTop: "8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  marginTop: "6px",
                 }}
-                onMouseDown={(e) =>
-                  !loading && (e.target.style.transform = "scale(0.98)")
-                }
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
               >
-                {loading ? "Memproses..." : "Masuk"}
-              </button>
-              <div style={{ textAlign: "center", marginTop: "8px" }}>
                 <button
-                  type="button"
-                  onClick={() => setTab("forget")}
-                  style={{
-                    color: "#667eea",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    fontSize: "14px",
-                  }}
+                  type="submit"
+                  disabled={loading}
+                  style={BUTTON_SUBMIT_STYLE(loading)}
+                  onMouseEnter={(e) =>
+                    !loading && (e.target.style.transform = "translateY(-1px)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.target.style.transform = "translateY(0)")
+                  }
                 >
-                  Lupa password?
+                  {loading ? "Memproses..." : "Masuk"}
                 </button>
+                <div style={{ textAlign: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => setTab("forget")}
+                    style={styles.linkButton}
+                  >
+                    Lupa password?
+                  </button>
+                </div>
               </div>
             </form>
           )}
@@ -387,217 +485,150 @@ export default function Login() {
           {tab === "register" && (
             <form
               onSubmit={onRegister}
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "22px" }}
             >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      color: "#333",
-                      fontWeight: "500",
-                      fontSize: "14px",
-                    }}
-                  >
-                    Username
-                  </label>
+              <div style={styles.twoColumnGrid}>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Username</label>
                   <input
                     value={rUsername}
                     onChange={(e) => setRU(e.target.value)}
                     required
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      border: "2px solid #e0e0e0",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      outline: "none",
-                      background: "white",
-                      color: "#333",
+                    placeholder="Username"
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                    onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
                   />
                 </div>
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      color: "#333",
-                      fontWeight: "500",
-                      fontSize: "14px",
-                    }}
-                  >
-                    Email
-                  </label>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Email</label>
                   <input
                     type="email"
                     value={rEmail}
                     onChange={(e) => setRE(e.target.value)}
                     required
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      border: "2px solid #e0e0e0",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      outline: "none",
-                      background: "white",
-                      color: "#333",
+                    placeholder="email@example.com"
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                    onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
                   />
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      color: "#333",
-                      fontWeight: "500",
-                      fontSize: "14px",
-                    }}
-                  >
-                    Password
-                  </label>
+              <div style={styles.twoColumnGrid}>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Password</label>
                   <input
                     type="password"
                     value={rPass}
                     onChange={(e) => setRP(e.target.value)}
                     required
                     minLength={6}
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      border: "2px solid #e0e0e0",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      outline: "none",
-                      background: "white",
-                      color: "#333",
+                    placeholder="Min. 6 karakter"
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                    onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
                   />
                 </div>
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      color: "#333",
-                      fontWeight: "500",
-                      fontSize: "14px",
-                    }}
-                  >
-                    Konfirmasi
-                  </label>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Konfirmasi Password</label>
                   <input
                     type="password"
                     value={rPass2}
                     onChange={(e) => setRP2(e.target.value)}
                     required
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      border: "2px solid #e0e0e0",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      outline: "none",
-                      background: "white",
-                      color: "#333",
+                    placeholder="Ulangi password"
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                    onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
                   />
                 </div>
               </div>
 
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    color: "#333",
-                    fontWeight: "500",
-                    fontSize: "14px",
-                  }}
-                >
-                  Role
-                </label>
-                <select
-                  value={rRole}
-                  onChange={(e) => setRRole(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    outline: "none",
-                    background: "white",
-                    color: "#333",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                  onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
-                >
-                  <option value="Karyawan" style={{ color: "#333" }}>
-                    Karyawan
-                  </option>
-                  <option value="HR" style={{ color: "#333" }}>
-                    HR
-                  </option>
-                  <option value="Admin" style={{ color: "#333" }}>
-                    Admin
-                  </option>
-                </select>
-                <small
-                  style={{
-                    color: "#888",
-                    fontSize: "12px",
-                    marginTop: "4px",
-                    display: "block",
-                  }}
-                >
-                  Di produksi, role diberikan oleh Admin
-                </small>
+              <div style={styles.twoColumnGrid}>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Status Karyawan</label>
+                  <select
+                    value={rStatusKaryawan}
+                    onChange={(e) => setRStatusKaryawan(e.target.value)}
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
+                  >
+                    <option value="Magang">Magang</option>
+                    <option value="Kontrak">Kontrak</option>
+                    <option value="Tetap">Tetap</option>
+                  </select>
+                </div>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Role</label>
+                  <select
+                    value={rRole}
+                    onChange={(e) => setRRole(e.target.value)}
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
+                  >
+                    <option value="Karyawan">Karyawan</option>
+                  </select>
+                  <small style={styles.helpText}>
+                    Role Admin hanya dapat diberikan oleh Administrator
+                  </small>
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: loading
-                    ? "#ccc"
-                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  marginTop: "8px",
-                }}
+                style={{ ...BUTTON_SUBMIT_STYLE(loading), marginTop: "6px" }}
+                onMouseEnter={(e) =>
+                  !loading && (e.target.style.transform = "translateY(-1px)")
+                }
+                onMouseLeave={(e) =>
+                  (e.target.style.transform = "translateY(0)")
+                }
               >
                 {loading ? "Memproses..." : "Daftar Sekarang"}
               </button>
@@ -608,26 +639,14 @@ export default function Login() {
           {tab === "forget" && (
             <form
               onSubmit={onForgetPassword}
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
             >
-              <p
-                style={{ margin: "0 0 8px 0", color: "#666", fontSize: "14px" }}
-              >
+              <p style={styles.paragraph}>
                 Masukkan email yang terdaftar untuk menerima instruksi reset
                 password.
               </p>
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    color: "#333",
-                    fontWeight: "500",
-                    fontSize: "14px",
-                  }}
-                >
-                  Email
-                </label>
+              <div style={styles.formElement}>
+                <label style={styles.label}>Email</label>
                 <input
                   type="email"
                   value={forgotEmail}
@@ -635,51 +654,36 @@ export default function Login() {
                   required
                   autoFocus
                   placeholder="nama@email.com"
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    outline: "none",
-                    background: "white",
-                    color: "#333",
+                  style={INPUT_STYLE}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#5C54A4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(92, 84, 164, 0.1)";
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                  onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#e0e0e0";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: loading
-                    ? "#ccc"
-                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  cursor: loading ? "not-allowed" : "pointer",
-                }}
+                style={BUTTON_SUBMIT_STYLE(loading)}
+                onMouseEnter={(e) =>
+                  !loading && (e.target.style.transform = "translateY(-1px)")
+                }
+                onMouseLeave={(e) =>
+                  (e.target.style.transform = "translateY(0)")
+                }
               >
                 {loading ? "Mengirim..." : "Kirim Instruksi"}
               </button>
-              <div style={{ textAlign: "center", marginTop: "8px" }}>
+              <div style={{ textAlign: "center", marginTop: "4px" }}>
                 <button
                   type="button"
                   onClick={() => setTab("login")}
-                  style={{
-                    color: "#667eea",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    fontSize: "14px",
-                  }}
+                  style={styles.linkButton}
                 >
                   ← Kembali ke login
                 </button>
@@ -691,25 +695,13 @@ export default function Login() {
           {tab === "reset" && (
             <form
               onSubmit={onResetPassword}
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
             >
-              <p
-                style={{ margin: "0 0 8px 0", color: "#666", fontSize: "14px" }}
-              >
+              <p style={styles.paragraph}>
                 Masukkan token dari email dan password baru Anda.
               </p>
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    color: "#333",
-                    fontWeight: "500",
-                    fontSize: "14px",
-                  }}
-                >
-                  Token Reset
-                </label>
+              <div style={styles.formElement}>
+                <label style={styles.label}>Token Reset</label>
                 <input
                   type="text"
                   value={resetToken}
@@ -717,155 +709,88 @@ export default function Login() {
                   required
                   autoFocus
                   placeholder="Paste token dari email"
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    border: "2px solid #e0e0e0",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    fontFamily: "monospace",
-                    outline: "none",
-                    background: "white",
-                    color: "#333",
+                  style={{ ...INPUT_STYLE, fontFamily: "monospace" }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#5C54A4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(92, 84, 164, 0.1)";
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                  onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#e0e0e0";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
                 {resetToken && (
-                  <small
-                    style={{
-                      color: "#4caf50",
-                      fontSize: "12px",
-                      marginTop: "4px",
-                      display: "block",
-                    }}
-                  >
-                    ✓ Token terdeteksi
-                  </small>
+                  <small style={styles.successText}>✓ Token terdeteksi</small>
                 )}
               </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      color: "#333",
-                      fontWeight: "500",
-                      fontSize: "14px",
-                    }}
-                  >
-                    Password Baru
-                  </label>
+              <div style={styles.twoColumnGrid}>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Password Baru</label>
                   <input
                     type="password"
                     value={newPass}
                     onChange={(e) => setNewPass(e.target.value)}
                     required
                     minLength={6}
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      border: "2px solid #e0e0e0",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      outline: "none",
-                      background: "white",
-                      color: "#333",
+                    placeholder="Min. 6 karakter"
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                    onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
                   />
                 </div>
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "8px",
-                      color: "#333",
-                      fontWeight: "500",
-                      fontSize: "14px",
-                    }}
-                  >
-                    Konfirmasi
-                  </label>
+                <div style={styles.formElement}>
+                  <label style={styles.label}>Konfirmasi Password</label>
                   <input
                     type="password"
                     value={newPass2}
                     onChange={(e) => setNewPass2(e.target.value)}
                     required
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      border: "2px solid #e0e0e0",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      outline: "none",
-                      background: "white",
-                      color: "#333",
+                    placeholder="Ulangi password"
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#667eea")}
-                    onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  background: loading
-                    ? "#ccc"
-                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  cursor: loading ? "not-allowed" : "pointer",
-                }}
+                style={BUTTON_SUBMIT_STYLE(loading)}
+                onMouseEnter={(e) =>
+                  !loading && (e.target.style.transform = "translateY(-1px)")
+                }
+                onMouseLeave={(e) =>
+                  (e.target.style.transform = "translateY(0)")
+                }
               >
                 {loading ? "Memproses..." : "Reset Password"}
               </button>
-              <div style={{ textAlign: "center", marginTop: "8px" }}>
+              <div style={{ textAlign: "center", marginTop: "4px" }}>
                 <button
                   type="button"
                   onClick={() => setTab("forget")}
-                  style={{
-                    color: "#667eea",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    fontSize: "14px",
-                  }}
+                  style={styles.linkButton}
                 >
                   Belum dapat token? Kirim ulang
                 </button>
               </div>
             </form>
           )}
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            padding: "20px",
-            textAlign: "center",
-            borderTop: "1px solid #f0f0f0",
-            background: "#fafafa",
-            color: "#888",
-            fontSize: "12px",
-          }}
-        >
-          © 2024 HR Management System. All rights reserved.
         </div>
       </div>
     </div>

@@ -8,7 +8,8 @@ const empty = {
   no_hp: "",
   jabatan: "",
   tanggal_masuk: "",
-  status_karyawan: "tetap",
+  // ⭐ Mengubah default value menjadi Title Case (konsisten dengan pendaftaran)
+  status_karyawan: "Tetap",
   user_id: null,
 };
 
@@ -80,9 +81,10 @@ export default function EmployeeDetail() {
               setForm({ ...form, status_karyawan: e.target.value })
             }
           >
-            <option>tetap</option>
-            <option>kontrak</option>
-            <option>magang</option>
+            {/* ⭐ Mengubah opsi ke Title Case dan menambahkan value eksplisit */}
+            <option value="Tetap">Tetap</option>
+            <option value="Kontrak">Kontrak</option>
+            <option value="Magang">Magang</option>
           </select>
         </div>
         <div className="flex">
