@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { stats } from "../services/api";
 
@@ -11,16 +11,63 @@ export default function AdminDashboard() {
     cutiPending: 0,
     gajiBulanIni: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (user?.role === "Admin") {
-      const allStats = stats();
+  // Helper untuk memformat Rupiah
+  const formatRupiah = (number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(Number(number) || 0);
+  };
+
+  // Fungsi fetch asynchronous
+  const fetchStatsData = useCallback(async () => {
+    if (user?.role !== "Admin" && user?.role !== "HR") return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const allStats = await stats.getDashboard();
       setStats(allStats);
+    } catch (e) {
+      setError(e.message || "Gagal memuat data dashboard.");
+      console.error("Dashboard Fetch Error:", e);
+    } finally {
+      setLoading(false);
     }
   }, [user]);
 
-  if (user?.role !== "Admin") {
-    return <h1>Access Denied</h1>;
+  useEffect(() => {
+    if (user?.role === "Admin" || user?.role === "HR") {
+      fetchStatsData();
+    }
+  }, [user, fetchStatsData]);
+
+  if (user?.role !== "Admin" && user?.role !== "HR") {
+    return <h1 style={{ color: "white", padding: "2rem" }}>Access Denied</h1>;
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: "2rem", color: "white", textAlign: "center" }}>
+        <h1>Dashboard</h1>
+        <p style={{ color: "#ccc" }}>Memuat data statistik dari backend...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: "2rem", color: "white" }}>
+        <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "red" }}>
+          Dashboard Error
+        </h1>
+        <p style={{ color: "red" }}>Gagal memuat data: {error}</p>
+      </div>
+    );
   }
 
   return (
@@ -33,7 +80,7 @@ export default function AdminDashboard() {
           color: "#fff",
         }}
       >
-        Dashboard
+        Dashboard {user.role}
       </h1>
 
       {/* Grid pertama: 3 kolom */}

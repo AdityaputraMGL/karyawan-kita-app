@@ -1,420 +1,609 @@
+import axios from "axios";
+
+// BASE URL API
+const API_BASE_URL = "http://localhost:5000/api";
+
+// Key untuk menyimpan Token dan Data User di LocalStorage
 const LS = {
-  users: "hr_users",
-  employees: "hr_employees",
-  attendance: "hr_attendance",
-  payroll: "hr_payroll",
-  leave: "hr_leave",
-  performance: "hr_performance",
-  session: "hr_session",
-  resetTokens: "hr_reset_tokens",
+  userToken: "hr_userToken",
+  currentUser: "hr_currentUser",
 };
 
-const uid = (prefix = "id") =>
-  prefix + "_" + Math.random().toString(36).slice(2, 9);
-const get = (k) => JSON.parse(localStorage.getItem(k) || "[]");
-const set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+// -----------------------------------------------------------
+// 1. AXIOS INSTANCE & INTERCEPTORS
+// -----------------------------------------------------------
 
-/** Seed data demo (hanya sekali, saat key belum ada) */
-export function seed() {
-  if (!localStorage.getItem(LS.users)) {
-    set(LS.users, [
-      {
-        user_id: "u1",
-        username: "admin",
-        password: "admin123",
-        email: "admin@x.com",
-        role: "Admin",
-      },
-      {
-        user_id: "u2",
-        username: "hr",
-        password: "hr123",
-        email: "hr@x.com",
-        role: "HR",
-      },
-      {
-        user_id: "u3",
-        username: "staff",
-        password: "staff123",
-        email: "s@x.com",
-        role: "Karyawan",
-      },
-    ]);
-  }
-  if (!localStorage.getItem(LS.employees)) {
-    set(LS.employees, [
-      {
-        employee_id: "e1",
-        user_id: "u3",
-        nama_lengkap: "Septian Naim",
-        alamat: "Malang",
-        no_hp: "08123",
-        jabatan: "Frontend Dev",
-        tanggal_masuk: "2024-02-01", // ⭐ PERBAIKAN SEED: Gunakan Title Case agar konsisten dengan form edit
-        status_karyawan: "Tetap",
-        role: "Karyawan",
-      },
-      {
-        employee_id: "e2",
-        user_id: null,
-        nama_lengkap: "Ayu Lestari",
-        alamat: "Jakarta",
-        no_hp: "08111",
-        jabatan: "HR Generalist",
-        tanggal_masuk: "2023-06-12", // ⭐ PERBAIKAN SEED: Gunakan Title Case agar konsisten dengan form edit
-        status_karyawan: "Tetap",
-        role: "HR",
-      },
-    ]);
-  }
-  ["attendance", "payroll", "leave", "performance", "resetTokens"].forEach(
-    (key) => {
-      if (!localStorage.getItem(LS[key])) set(LS[key], []);
-    }
-  );
-}
-
-/** Session */
-export function getCurrentUser() {
-  return JSON.parse(localStorage.getItem(LS.session) || "null");
-}
-
-/** === REGISTER === */
-// ⭐ TERIMA status_karyawan di payload
-export function register({
-  username,
-  password,
-  email,
-  role = "Karyawan",
-  status_karyawan = "Magang", // Nilai default jika tidak ada
-}) {
-  const users = get(LS.users);
-
-  if (!username || !password)
-    throw new Error("Username dan password wajib diisi");
-  const exists = users.some(
-    (u) => u.username.toLowerCase() === username.toLowerCase()
-  );
-  if (exists) throw new Error("Username sudah digunakan");
-
-  const newUser = {
-    user_id: uid("u"),
-    username: username.trim(),
-    password,
-    email: (email || "").trim(),
-    role,
-  };
-  users.push(newUser);
-  set(LS.users, users);
-
-  const emps = get(LS.employees);
-  emps.push({
-    employee_id: uid("emp"),
-    user_id: newUser.user_id,
-    nama_lengkap: newUser.username,
-    alamat: "",
-    no_hp: "",
-    jabatan: role === "HR" ? "HR" : "Karyawan",
-    tanggal_masuk: new Date().toISOString().slice(0, 10), // ⭐ PERBAIKAN UTAMA: Gunakan status_karyawan yang diterima dari form
-    status_karyawan: status_karyawan,
-    role: role,
-  });
-  set(LS.employees, emps);
-
-  const token = btoa(
-    JSON.stringify({ sub: newUser.user_id, role: newUser.role, ts: Date.now() })
-  );
-  const session = {
-    user_id: newUser.user_id,
-    username: newUser.username,
-    role: newUser.role,
-    token,
-  };
-  localStorage.setItem(LS.session, JSON.stringify(session));
-  return session;
-}
-
-/** === LOGIN === */
-export async function login(username, password) {
-  // ... (tidak ada perubahan di sini)
-  const users = get(LS.users);
-  const found = users.find(
-    (u) => u.username === username && u.password === password
-  );
-  if (!found) throw new Error("Username/password salah");
-
-  const token = btoa(
-    JSON.stringify({ sub: found.user_id, role: found.role, ts: Date.now() })
-  );
-  const session = {
-    user_id: found.user_id,
-    username: found.username,
-    role: found.role,
-    token,
-  };
-  localStorage.setItem(LS.session, JSON.stringify(session));
-  return session;
-}
-
-export function logout() {
-  localStorage.removeItem(LS.session);
-}
-
-/** === FORGOT PASSWORD === */
-export async function forgotPassword(email) {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  const users = get(LS.users);
-  const user = users.find(
-    (u) => u.email && u.email.toLowerCase() === email.toLowerCase()
-  );
-
-  if (!user) {
-    throw new Error("Email tidak terdaftar");
-  }
-
-  const token = generateResetToken();
-  const resetData = {
-    email: email.toLowerCase(),
-    token: token,
-    expiresAt: Date.now() + 3600000,
-    createdAt: Date.now(),
-  };
-
-  const resetTokens = get(LS.resetTokens);
-  const filteredTokens = resetTokens.filter(
-    (rt) => rt.email !== email.toLowerCase()
-  );
-  filteredTokens.push(resetData);
-  set(LS.resetTokens, filteredTokens);
-
-  console.log("🔑 Reset Token (copy ini untuk testing):", token);
-  console.log("📧 Email:", email);
-  console.log("⏰ Expired dalam 1 jam");
-
-  return {
-    success: true,
-    message: "Link reset password telah dikirim ke email Anda",
-    devToken: token,
-  };
-}
-
-/** === RESET PASSWORD === */
-export async function resetPassword(token, newPassword) {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  if (!newPassword || newPassword.length < 6) {
-    throw new Error("Password minimal 6 karakter");
-  }
-
-  const resetTokens = get(LS.resetTokens);
-  const resetData = resetTokens.find(
-    (rt) => rt.token === token && rt.expiresAt > Date.now()
-  );
-
-  if (!resetData) {
-    throw new Error("Token tidak valid atau sudah expired");
-  }
-
-  const users = get(LS.users);
-  const userIndex = users.findIndex(
-    (u) => u.email && u.email.toLowerCase() === resetData.email
-  );
-
-  if (userIndex === -1) {
-    throw new Error("User tidak ditemukan");
-  }
-
-  users[userIndex].password = newPassword;
-  set(LS.users, users);
-
-  const updatedTokens = resetTokens.filter((rt) => rt.token !== token);
-  set(LS.resetTokens, updatedTokens);
-
-  console.log("✅ Password berhasil direset untuk:", resetData.email);
-
-  return {
-    success: true,
-    message: "Password berhasil direset",
-  };
-}
-
-function generateResetToken() {
-  return (
-    Math.random().toString(36).substring(2, 15) +
-    Math.random().toString(36).substring(2, 15)
-  );
-}
-
-export function cleanupExpiredTokens() {
-  const resetTokens = get(LS.resetTokens);
-  const validTokens = resetTokens.filter((rt) => rt.expiresAt > Date.now());
-  set(LS.resetTokens, validTokens);
-  console.log(
-    `🧹 Cleanup: ${
-      resetTokens.length - validTokens.length
-    } expired tokens removed`
-  );
-}
-
-/* ================= EMPLOYEES ================= */
-export const employees = {
-  findAll(q = "") {
-    const data = get(LS.employees);
-    if (!q) return data;
-    const s = q.toLowerCase();
-    return data.filter(
-      (d) =>
-        d.nama_lengkap.toLowerCase().includes(s) ||
-        (d.jabatan || "").toLowerCase().includes(s)
-    );
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
   },
-  findById(id) {
-    const employee = get(LS.employees).find(
-      (e) => String(e.employee_id) === String(id)
-    ); // Ambil role dari data users jika role employee belum tersedia
-    if (employee && !employee.role && employee.user_id) {
-      const user = get(LS.users).find((u) => u.user_id === employee.user_id);
-      if (user) {
-        return { ...employee, role: user.role };
+});
+
+// Interceptor Permintaan
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem(LS.userToken);
+
+    console.log("📤 Request interceptor:");
+    console.log("  - URL:", config.baseURL + config.url);
+
+    if (token) {
+      console.log("  - ✅ Token found, adding to headers");
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      console.log("  - ⚠️ No token found in localStorage");
+    }
+
+    return config;
+  },
+  (error) => {
+    console.error("❌ Request interceptor error:", error);
+    return Promise.reject(error);
+  }
+);
+
+// Fungsi Logout global
+export function logout() {
+  console.log("🚪 Logging out...");
+  localStorage.removeItem(LS.userToken);
+  localStorage.removeItem(LS.currentUser);
+
+  // Redirect ke halaman login
+  if (
+    window.location.pathname !== "/login" &&
+    window.location.pathname !== "/"
+  ) {
+    window.location.href = "/login";
+  }
+}
+
+// Interceptor Respon - DIPERBAIKI
+apiClient.interceptors.response.use(
+  (response) => {
+    console.log("✅ Response received:", response.config.url);
+    return response;
+  },
+  (error) => {
+    console.error("❌ Response error:", error);
+
+    // Cek jika error karena network (backend tidak berjalan)
+    if (!error.response) {
+      console.error("❌ Backend tidak dapat dijangkau!");
+      return Promise.reject(
+        new Error(
+          "Backend tidak dapat dijangkau. Pastikan server berjalan di port 5000."
+        )
+      );
+    }
+
+    const status = error.response.status;
+    const errorData = error.response.data;
+
+    console.error("  - Status:", status);
+    console.error("  - Error data:", errorData);
+
+    // PENTING: Hanya logout jika benar-benar masalah autentikasi
+    if (status === 401) {
+      console.error("❌ Auth error 401: Token invalid atau expired");
+
+      // Cek apakah ini endpoint login (jangan logout saat login gagal)
+      if (!error.config.url.includes("/login")) {
+        logout();
+        return Promise.reject(
+          new Error("Sesi berakhir. Silakan login kembali.")
+        );
       }
     }
-    return employee;
-  },
-  create(payload) {
-    const data = get(LS.employees);
-    const employee = { employee_id: uid("emp"), ...payload };
-    data.push(employee);
-    set(LS.employees, data);
-    return employee;
-  },
-  update(id, payload) {
-    const data = get(LS.employees);
-    const i = data.findIndex((e) => e.employee_id === id);
-    if (i >= 0) {
-      data[i] = { ...data[i], ...payload };
-      set(LS.employees, data);
+
+    if (status === 403) {
+      console.error("❌ Auth error 403: Akses ditolak");
+      return Promise.reject(
+        new Error("Anda tidak memiliki akses ke resource ini.")
+      );
     }
-  },
-  remove(id) {
-    set(
-      LS.employees,
-      get(LS.employees).filter((e) => e.employee_id !== id)
-    );
-  },
-};
 
-/* ================= ATTENDANCE ================= */
-export const attendance = {
-  findAll() {
-    return get(LS.attendance).sort((a, b) => (a.tanggal < b.tanggal ? -1 : 1));
-  },
-  create(payload) {
-    const data = get(LS.attendance);
-    const row = { attendance_id: uid("att"), ...payload };
-    data.push(row);
-    set(LS.attendance, data);
-  },
-  update(id, payload) {
-    const data = get(LS.attendance);
-    const i = data.findIndex((a) => a.attendance_id === id);
-    if (i >= 0) {
-      data[i] = { ...data[i], ...payload };
-      set(LS.attendance, data);
+    return Promise.reject(error);
+  }
+);
+
+// -----------------------------------------------------------
+// 2. FUNGSI AUTHENTIKASI
+// -----------------------------------------------------------
+
+export async function login(username, password) {
+  try {
+    console.log("🔐 Attempting login for:", username);
+    const res = await apiClient.post("/users/login", { username, password });
+    console.log("✅ Login response:", res.data);
+
+    const { token, user } = res.data;
+
+    if (!token) {
+      throw new Error("Server tidak mengirim token");
     }
-  },
-  approve(id, status) {
-    const data = get(LS.attendance);
-    const i = data.findIndex((a) => a.attendance_id === id);
-    if (i >= 0) {
-      data[i].status = status;
-      set(LS.attendance, data);
+
+    console.log("💾 Saving token to localStorage");
+
+    // Simpan token
+    localStorage.setItem(LS.userToken, token);
+    localStorage.setItem(LS.currentUser, JSON.stringify(user));
+
+    // Verify
+    const savedToken = localStorage.getItem(LS.userToken);
+    console.log("✅ Token saved:", savedToken ? "YES" : "NO");
+
+    if (!savedToken) {
+      throw new Error("Gagal menyimpan token ke localStorage");
     }
-  },
-};
 
-/* ================= PAYROLL ================= */
-export const payroll = {
-  findAll() {
-    return get(LS.payroll).sort((a, b) => (a.periode < b.periode ? 1 : -1));
-  },
-  /**
-   * FUNGSI BARU: Membersihkan data payroll yang tidak valid (Pokok/Total terlalu kecil).
-   * Digunakan di Payroll.jsx sebelum setList.
-   */ cleanData(payrollList) {
-    return payrollList.filter((p) => {
-      const gajiPokok = Number(p.gaji_pokok);
-      const totalGaji = Number(p.total_gaji);
-      return gajiPokok > 1000 && totalGaji > 1000;
-    });
-  },
-  create(payload) {
-    const data = get(LS.payroll);
-    const row = { payroll_id: uid("pay"), ...payload };
-    data.push(row);
-    set(LS.payroll, data);
-  },
-};
-
-/* ================= LEAVE ================= */
-export const leave = {
-  findAll() {
-    return get(LS.leave).sort((a, b) =>
-      a.tanggal_pengajuan < b.tanggal_pengajuan ? 1 : -1
-    );
-  },
-  create(payload) {
-    const data = get(LS.leave);
-    const row = { leave_id: uid("lv"), ...payload };
-    data.push(row);
-    set(LS.leave, data);
-  },
-  update(id, payload) {
-    const data = get(LS.leave);
-    const i = data.findIndex((x) => x.leave_id === id);
-    if (i >= 0) {
-      data[i] = { ...data[i], ...payload };
-      set(LS.leave, data);
-    }
-  },
-};
-
-/* ================= PERFORMANCE ================= */
-export const performance = {
-  findAll() {
-    return get(LS.performance);
-  },
-  create(payload) {
-    const data = get(LS.performance);
-    const row = { performance_id: uid("pf"), ...payload };
-    data.push(row);
-    set(LS.performance, data);
-  },
-};
-
-/* ================= DASHBOARD STATS ================= */
-export function stats() {
-  const emps = employees.findAll();
-  const today = new Date().toISOString().slice(0, 10);
-  const atts = attendance.findAll().filter((a) => a.tanggal === today);
-  const izin = atts.filter((a) => a.status !== "hadir").length;
-  const cutiPending = leave
-    .findAll()
-    .filter((l) => l.status === "pending").length; // ⭐ PERBAIKAN UTAMA: Ambil data payroll HANYA untuk bulan saat ini
-  const currentPeriod = new Date().toISOString().slice(0, 7);
-  const currentMonthPayroll = payroll
-    .findAll()
-    .filter((p) => p.periode === currentPeriod); // ⭐ PERBAIKAN UTAMA: Hitung total gaji dari data valid bulan ini
-
-  const gajiBulanIni = currentMonthPayroll
-    .filter((p) => Number(p.gaji_pokok) > 1000 && Number(p.total_gaji) > 1000)
-    .reduce((s, p) => s + Number(p.total_gaji || 0), 0);
-
-  return {
-    emp: emps.length,
-    hadir: atts.length - izin,
-    izin,
-    cutiPending,
-    gajiBulanIni,
-  };
+    return user;
+  } catch (error) {
+    console.error("❌ Login error:", error);
+    const errorMsg =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message ||
+      "Login gagal";
+    throw new Error(errorMsg);
+  }
 }
+
+export async function register(payload) {
+  try {
+    console.log("📝 Attempting registration...");
+    const res = await apiClient.post("/users/register", payload);
+    const { token, user } = res.data;
+
+    localStorage.setItem(LS.userToken, token);
+    localStorage.setItem(LS.currentUser, JSON.stringify(user));
+    console.log("✅ Registration successful");
+
+    return user;
+  } catch (error) {
+    console.error("❌ Registration error:", error);
+    const errorMsg =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message ||
+      "Registrasi gagal";
+    throw new Error(errorMsg);
+  }
+}
+
+export function getCurrentUser() {
+  const user = localStorage.getItem(LS.currentUser);
+  return user ? JSON.parse(user) : null;
+}
+
+export function isAuthenticated() {
+  const token = localStorage.getItem(LS.userToken);
+  const user = getCurrentUser();
+  return !!(token && user);
+}
+
+export function forgotPassword(email) {
+  return apiClient.post("/users/forgot-password", { email });
+}
+
+export function resetPassword(token, newPassword) {
+  return apiClient.post("/users/reset-password", { token, newPassword });
+}
+
+// Helper untuk memastikan response adalah array
+const ensureArray = (data) => {
+  if (data && typeof data === "object" && Array.isArray(data.data)) {
+    return data.data;
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return [];
+};
+
+// -----------------------------------------------------------
+// 3. FUNGSI API LAINNYA
+// -----------------------------------------------------------
+
+// EMPLOYEE
+export const employee = {
+  findAll: async () => {
+    try {
+      console.log("📡 Fetching all employees...");
+      const res = await apiClient.get("/employees");
+      const employees = ensureArray(res.data);
+      console.log(`✅ Loaded ${employees.length} employees`);
+      return employees;
+    } catch (error) {
+      console.error("❌ Error fetching employees:", error.message);
+      throw error;
+    }
+  },
+
+  findById: async (id) => {
+    try {
+      const res = await apiClient.get(`/employees/${id}`);
+      return res.data;
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengambil data karyawan.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  create: async (payload) => {
+    try {
+      console.log("📤 Creating employee:", payload);
+      const res = await apiClient.post("/employees", payload);
+      console.log("✅ Employee created:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error creating employee:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menambahkan karyawan.";
+      const errorDetails = error.response?.data?.details;
+      const fullError = errorDetails
+        ? `${errorMsg}\n${errorDetails}`
+        : errorMsg;
+      throw new Error(fullError);
+    }
+  },
+
+  update: async (id, payload) => {
+    try {
+      const res = await apiClient.put(`/employees/${id}`, payload);
+      return res.data;
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengupdate karyawan.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      console.log(`📤 Deleting payroll ID: ${id}`);
+      await apiClient.delete(`/payroll/${id}`);
+      console.log("✅ Payroll deleted");
+    } catch (error) {
+      console.error("❌ Error deleting payroll:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menghapus payroll.";
+      throw new Error(errorMsg);
+    }
+  },
+};
+
+// ATTENDANCE
+export const attendance = {
+  findAll: async () => {
+    try {
+      console.log("📡 Fetching all attendance...");
+      const res = await apiClient.get("/attendance");
+      const attendanceList = ensureArray(res.data);
+      console.log(`✅ Loaded ${attendanceList.length} attendance records`);
+      return attendanceList;
+    } catch (error) {
+      console.error("❌ Error fetching attendance:", error);
+      console.error("  - Status:", error.response?.status);
+      console.error("  - Data:", error.response?.data);
+      throw error;
+    }
+  },
+
+  findById: async (id) => {
+    try {
+      console.log(`📡 Fetching attendance ID: ${id}`);
+      const res = await apiClient.get(`/attendance/${id}`);
+      console.log("✅ Attendance loaded:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error fetching attendance:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengambil data absensi.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  create: async (payload) => {
+    try {
+      console.log("📤 Creating attendance:", payload);
+      const res = await apiClient.post("/attendance", payload);
+      console.log("✅ Attendance created:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error creating attendance:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menambahkan absensi.";
+      const errorDetails = error.response?.data?.details;
+      const fullError = errorDetails
+        ? `${errorMsg}\n${errorDetails}`
+        : errorMsg;
+      throw new Error(fullError);
+    }
+  },
+
+  update: async (id, payload) => {
+    try {
+      console.log(`📤 Updating attendance ID ${id}:`, payload);
+      const res = await apiClient.put(`/attendance/${id}`, payload);
+      console.log("✅ Attendance updated:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error updating attendance:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengupdate absensi.";
+      const errorDetails = error.response?.data?.details;
+      const fullError = errorDetails
+        ? `${errorMsg}\n${errorDetails}`
+        : errorMsg;
+      throw new Error(fullError);
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      console.log(`📤 Deleting attendance ID: ${id}`);
+      await apiClient.delete(`/attendance/${id}`);
+      console.log("✅ Attendance deleted");
+    } catch (error) {
+      console.error("❌ Error deleting attendance:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menghapus absensi.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  checkin: async (payload) => {
+    try {
+      console.log("📤 Check-in:", payload);
+      const res = await apiClient.post("/attendance/checkin", payload);
+      console.log("✅ Check-in successful:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error during check-in:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal melakukan check-in.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  checkout: async (id, payload) => {
+    try {
+      console.log(`📤 Check-out for attendance ID ${id}:`, payload);
+      const res = await apiClient.put(`/attendance/checkout/${id}`, payload);
+      console.log("✅ Check-out successful:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error during check-out:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal melakukan check-out.";
+      throw new Error(errorMsg);
+    }
+  },
+};
+
+// PAYROLL - LENGKAP DENGAN DELETE
+export const payroll = {
+  findAll: async (period = "") => {
+    try {
+      console.log("📡 Fetching all payroll...");
+      const res = await apiClient.get(`/payroll?period=${period}`);
+      const payrollList = ensureArray(res.data);
+      console.log(`✅ Loaded ${payrollList.length} payroll records`);
+      return payrollList;
+    } catch (error) {
+      console.error("❌ Error fetching payroll:", error.message);
+      throw error;
+    }
+  },
+
+  findById: async (id) => {
+    try {
+      console.log(`📡 Fetching payroll ID: ${id}`);
+      const res = await apiClient.get(`/payroll/${id}`);
+      console.log("✅ Payroll loaded:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error fetching payroll:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengambil data payroll.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  create: async (payload) => {
+    try {
+      console.log("📤 Creating payroll:", payload);
+      const res = await apiClient.post("/payroll", payload);
+      console.log("✅ Payroll created:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error creating payroll:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menambahkan payroll.";
+      const errorDetails = error.response?.data?.details;
+      const fullError = errorDetails
+        ? `${errorMsg}\n${errorDetails}`
+        : errorMsg;
+      throw new Error(fullError);
+    }
+  },
+
+  update: async (id, payload) => {
+    try {
+      console.log(`📤 Updating payroll ID ${id}:`, payload);
+      const res = await apiClient.put(`/payroll/${id}`, payload);
+      console.log("✅ Payroll updated:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error updating payroll:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengupdate payroll.";
+      const errorDetails = error.response?.data?.details;
+      const fullError = errorDetails
+        ? `${errorMsg}\n${errorDetails}`
+        : errorMsg;
+      throw new Error(fullError);
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      console.log(`📤 Deleting payroll ID: ${id}`);
+      await apiClient.delete(`/payroll/${id}`);
+      console.log("✅ Payroll deleted");
+    } catch (error) {
+      console.error("❌ Error deleting payroll:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menghapus payroll.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  // Fungsi helper untuk membersihkan data (jika diperlukan)
+  cleanData: (payrollList) => {
+    return payrollList.filter((p) => p && p.payroll_id);
+  },
+};
+
+// LEAVE
+export const leave = {
+  findAll: async () => {
+    try {
+      const res = await apiClient.get("/leave");
+      return ensureArray(res.data);
+    } catch (error) {
+      console.error("Error fetching leave:", error.message);
+      throw error;
+    }
+  },
+  create: async (payload) => {
+    try {
+      const res = await apiClient.post("/leave", payload);
+      return res.data;
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengajukan cuti.";
+      throw new Error(errorMsg);
+    }
+  },
+  update: async (id, status) => {
+    try {
+      const res = await apiClient.put(`/leave/${id}`, { status });
+      return res.data;
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengupdate cuti.";
+      throw new Error(errorMsg);
+    }
+  },
+  updateStatus: async (id, status) => {
+    try {
+      const res = await apiClient.put(`/leave/${id}/status`, { status });
+      return res.data;
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengupdate status cuti.";
+      throw new Error(errorMsg);
+    }
+  },
+};
+
+// PERFORMANCE
+export const performance = {
+  findAll: async () => {
+    try {
+      const res = await apiClient.get("/performance");
+      return ensureArray(res.data);
+    } catch (error) {
+      console.error("Error fetching performance:", error.message);
+      throw error;
+    }
+  },
+  create: async (payload) => {
+    try {
+      const res = await apiClient.post("/performance", payload);
+      return res.data;
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menambahkan data performa.";
+      throw new Error(errorMsg);
+    }
+  },
+  update: async (id, payload) => {
+    try {
+      const res = await apiClient.put(`/performance/${id}`, payload);
+      return res.data;
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal mengupdate data performa.";
+      throw new Error(errorMsg);
+    }
+  },
+};
+
+// DASHBOARD STATS
+export const stats = {
+  getDashboard: async () => {
+    try {
+      const res = await apiClient.get("/stats/dashboard");
+      const data = res.data;
+
+      return {
+        emp: data.emp || 0,
+        hadir: data.hadir || 0,
+        izin: data.izin || 0,
+        cutiPending: data.cutiPending || 0,
+        gajiBulanIni: data.gajiBulanIni || 0,
+      };
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      return {
+        emp: 0,
+        hadir: 0,
+        izin: 0,
+        cutiPending: 0,
+        gajiBulanIni: 0,
+      };
+    }
+  },
+};

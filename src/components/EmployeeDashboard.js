@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-// Import useNavigate jika Anda menggunakan tombol Quick Actions
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-// Asumsi api.attendance, api.leave, api.employees sudah tersedia
 import * as api from "../services/api";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate(); // Inisialisasi useNavigate
+  const navigate = useNavigate();
 
   const [stats, setStats] = useState({
     totalHadir: 0,
@@ -20,6 +18,8 @@ export default function Dashboard() {
     upcomingLeave: [],
   });
 
+  const [loading, setLoading] = useState(true);
+
   const loggedInEmployeeId = user.employee_id || user.username;
   const isAdmin = user.role === "Admin";
   const isHR = user.role === "HR";
@@ -27,71 +27,96 @@ export default function Dashboard() {
 
   useEffect(() => {
     calculateStats();
-    // Tambahkan dependencies yang relevan
   }, [user.role, loggedInEmployeeId]);
 
-  const calculateStats = () => {
-    // Ambil data absensi dan cuti
-    const allAttendance = api.attendance.findAll();
-    const allLeave = api.leave.findAll();
+  // ✅ PERBAIKAN: Tambahkan async dan await
+  const calculateStats = async () => {
+    try {
+      setLoading(true);
 
-    // Data untuk user yang login
-    const myAttendance = allAttendance.filter(
-      (a) => a.employee_id === loggedInEmployeeId
-    );
-    const myLeave = allLeave.filter(
-      (l) => l.employee_id === loggedInEmployeeId
-    );
+      // ✅ PERBAIKAN: Tambahkan await dan pastikan hasil adalah array
+      const allAttendance = await api.attendance.findAll();
+      const allLeave = await api.leave.findAll();
 
-    const totalHadir = myAttendance.filter((a) => a.status === "hadir").length;
+      // Pastikan data adalah array
+      const attendanceArray = Array.isArray(allAttendance) ? allAttendance : [];
+      const leaveArray = Array.isArray(allLeave) ? allLeave : [];
 
-    const approvedLeave = myLeave.filter(
-      (l) => l.status === "approved" && l.jenis_pengajuan === "Cuti"
-    );
-    const cutiDigunakan = approvedLeave.length;
-    const sisaCuti = 12 - cutiDigunakan;
+      // Data untuk user yang login
+      const myAttendance = attendanceArray.filter(
+        (a) => a.employee_id === loggedInEmployeeId
+      );
+      const myLeave = leaveArray.filter(
+        (l) => l.employee_id === loggedInEmployeeId
+      );
 
-    // Pending approval (absensi WFH/Hybrid + cuti pending)
-    const pendingAttendance = myAttendance.filter(
-      (a) =>
-        // Asumsi ada field 'needs_approval' atau status khusus
-        a.status_approval === "pending" &&
-        (a.tipe_kerja === "WFH" || a.tipe_kerja === "Hybrid")
-    ).length;
-    const pendingLeave = myLeave.filter((l) => l.status === "pending").length;
-    const pendingApproval = pendingAttendance + pendingLeave;
+      const totalHadir = myAttendance.filter(
+        (a) => a.status === "hadir"
+      ).length;
 
-    // Recent attendance (5 terakhir)
-    const recentAttendance = myAttendance
-      .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal))
-      .slice(0, 5);
+      const approvedLeave = myLeave.filter(
+        (l) => l.status === "approved" && l.jenis_pengajuan === "Cuti"
+      );
+      const cutiDigunakan = approvedLeave.length;
+      const sisaCuti = 12 - cutiDigunakan;
 
-    // Recent leave (5 terakhir)
-    const recentLeave = myLeave
-      .sort(
-        (a, b) => new Date(b.tanggal_pengajuan) - new Date(a.tanggal_pengajuan)
-      )
-      .slice(0, 5);
+      // Pending approval (absensi WFH/Hybrid + cuti pending)
+      const pendingAttendance = myAttendance.filter(
+        (a) =>
+          a.status_approval === "pending" &&
+          (a.tipe_kerja === "WFH" || a.tipe_kerja === "Hybrid")
+      ).length;
+      const pendingLeave = myLeave.filter((l) => l.status === "pending").length;
+      const pendingApproval = pendingAttendance + pendingLeave;
 
-    // Upcoming leave (cuti yang akan datang, status approved)
-    const today = new Date();
-    const upcomingLeave = myLeave
-      .filter(
-        (l) => l.status === "approved" && new Date(l.tanggal_mulai) >= today
-      )
-      .sort((a, b) => new Date(a.tanggal_mulai) - new Date(b.tanggal_mulai))
-      .slice(0, 3);
+      // Recent attendance (5 terakhir)
+      const recentAttendance = myAttendance
+        .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal))
+        .slice(0, 5);
 
-    setStats({
-      totalHadir,
-      totalCuti: myLeave.length,
-      sisaCuti,
-      cutiDigunakan,
-      pendingApproval,
-      recentAttendance,
-      recentLeave,
-      upcomingLeave,
-    });
+      // Recent leave (5 terakhir)
+      const recentLeave = myLeave
+        .sort(
+          (a, b) =>
+            new Date(b.tanggal_pengajuan) - new Date(a.tanggal_pengajuan)
+        )
+        .slice(0, 5);
+
+      // Upcoming leave (cuti yang akan datang, status approved)
+      const today = new Date();
+      const upcomingLeave = myLeave
+        .filter(
+          (l) => l.status === "approved" && new Date(l.tanggal_mulai) >= today
+        )
+        .sort((a, b) => new Date(a.tanggal_mulai) - new Date(b.tanggal_mulai))
+        .slice(0, 3);
+
+      setStats({
+        totalHadir,
+        totalCuti: myLeave.length,
+        sisaCuti,
+        cutiDigunakan,
+        pendingApproval,
+        recentAttendance,
+        recentLeave,
+        upcomingLeave,
+      });
+    } catch (error) {
+      console.error("Error calculating stats:", error);
+      // Set default values jika error
+      setStats({
+        totalHadir: 0,
+        totalCuti: 0,
+        sisaCuti: 12,
+        cutiDigunakan: 0,
+        pendingApproval: 0,
+        recentAttendance: [],
+        recentLeave: [],
+        upcomingLeave: [],
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getGreeting = () => {
@@ -112,7 +137,6 @@ export default function Dashboard() {
   const styles = {
     mainContainer: { padding: "2rem 1.5rem 1.5rem 1.5rem" },
 
-    // Header Style (Warna Solid sesuai tema gelap)
     headerCard: {
       backgroundColor: "#3A4068",
       color: "white",
@@ -127,14 +151,12 @@ export default function Dashboard() {
     },
     subtitle: { fontSize: "1rem", margin: 0, opacity: 0.8 },
 
-    // Grid untuk Kartu (4 kolom)
     statsGrid: {
       display: "grid",
       gridTemplateColumns: "repeat(4, 1fr)",
       gap: "1.2rem",
       marginBottom: "2rem",
     },
-    // Style Kartu Default
     statCard: (color) => ({
       backgroundColor: color,
       borderRadius: "12px",
@@ -151,7 +173,6 @@ export default function Dashboard() {
     },
     cardTitle: { fontSize: "1rem", opacity: 0.9 },
 
-    // Quick Actions
     actionsHeader: {
       fontSize: "1.5rem",
       fontWeight: "600",
@@ -173,7 +194,6 @@ export default function Dashboard() {
       transition: "opacity 0.2s",
     }),
 
-    // Bagian Bawah (2 Kolom)
     bottomGrid: {
       display: "grid",
       gridTemplateColumns: "repeat(2, 1fr)",
@@ -190,7 +210,7 @@ export default function Dashboard() {
       borderRadius: "12px",
       padding: "0",
       boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
-      overflow: "hidden", // Penting untuk tabel
+      overflow: "hidden",
     },
     table: {
       width: "100%",
@@ -212,11 +232,19 @@ export default function Dashboard() {
       whiteSpace: "nowrap",
     },
   };
-  // --- END INLINE STYLES ---
+
+  // ✅ Tambahkan loading state
+  if (loading) {
+    return (
+      <div style={{ padding: "2rem", color: "white", textAlign: "center" }}>
+        <h2>Memuat data...</h2>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.mainContainer}>
-      {/* Header Welcome (Rapi) */}
+      {/* Header Welcome */}
       <div style={styles.headerCard}>
         <h2 style={styles.greeting}>
           {getGreeting()}, {user.nama_lengkap || user.username}! 👋
@@ -230,15 +258,13 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Statistik Cards (Rapi) */}
+      {/* Statistik Cards */}
       <div style={styles.statsGrid}>
-        {/* Total Kehadiran */}
         <div style={styles.statCard("#5C54A4")}>
           <div style={styles.cardValue}>{stats.totalHadir}</div>
           <div style={styles.cardTitle}>Total Kehadiran</div>
         </div>
 
-        {/* Sisa Cuti */}
         <div style={styles.statCard("#FF6384")}>
           <div style={styles.cardValue}>{stats.sisaCuti}</div>
           <div style={styles.cardTitle}>
@@ -246,23 +272,20 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Pending Approval */}
         <div style={styles.statCard("#4facfe")}>
           <div style={styles.cardValue}>{stats.pendingApproval}</div>
           <div style={styles.cardTitle}>Menunggu Approval</div>
         </div>
 
-        {/* Total Pengajuan */}
         <div style={styles.statCard("#3CB371")}>
           <div style={styles.cardValue}>{stats.totalCuti}</div>
           <div style={styles.cardTitle}>Total Pengajuan Cuti</div>
         </div>
       </div>
 
-      {/* Quick Actions (Rapi) */}
+      {/* Quick Actions */}
       <h3 style={styles.actionsHeader}>⚡ Quick Actions</h3>
       <div style={styles.actionsGrid}>
-        {/* Tombol untuk Karyawan/HR (Ajukan Cuti & Catat Absensi) */}
         {!isAdmin && (
           <>
             <button
@@ -280,7 +303,6 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* Tombol untuk HR/Admin (Kelola) */}
         {(isAdmin || isHR) && (
           <>
             <button
@@ -301,7 +323,6 @@ export default function Dashboard() {
 
       {/* Bagian Bawah: Cuti Yang Akan Datang & Pengajuan Terbaru */}
       <div style={styles.bottomGrid}>
-        {/* Box Kiri: Cuti Yang Akan Datang */}
         {!isAdmin && (
           <div>
             <h3 style={styles.tableHeader}>📅 Cuti Yang Akan Datang</h3>
@@ -315,7 +336,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {stats.upcomingLeave.length > 0 ? (
-                    stats.upcomingLeave.map((l, index) => (
+                    stats.upcomingLeave.map((l) => (
                       <tr key={l.leave_id}>
                         <td style={styles.td}>{l.jenis_pengajuan}</td>
                         <td style={styles.td}>
@@ -345,14 +366,12 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Box Kanan: Pengajuan Terbaru (untuk HR/Admin) atau Absensi Terbaru (untuk Karyawan) */}
         <div style={{ gridColumn: isAdmin ? "1 / -1" : "auto" }}>
           <h3 style={styles.tableHeader}>
             {isAdmin || isHR ? "📋 Pengajuan Terbaru" : "🕐 Absensi Terbaru"}
           </h3>
 
           <div style={styles.tableCard}>
-            {/* Tampilkan tabel Pengajuan Terbaru (Cuti/Izin) untuk Admin/HR */}
             {(isAdmin || isHR) && (
               <table style={styles.table}>
                 <thead>
@@ -419,7 +438,6 @@ export default function Dashboard() {
               </table>
             )}
 
-            {/* Tampilkan tabel Absensi Terbaru HANYA untuk Karyawan biasa */}
             {isEmployee && (
               <table style={styles.table}>
                 <thead>
@@ -462,15 +480,15 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Footer Info (Tetap rapi) */}
+      {/* Footer Info */}
       <div
         style={{
-          ...styles.card,
           marginTop: "2rem",
           background: "#3A4068",
           textAlign: "center",
           padding: "1rem",
           border: "1px solid #5C54A4",
+          borderRadius: "12px",
         }}
       >
         <p

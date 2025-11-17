@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import * as api from "../services/api";
+import { leave } from "../services/api";
 
-// --- Inline Styles untuk Kerapian dan Konsistensi ---
+// --- Inline Styles ---
 const styles = {
-  // Global Padding
   mainContainer: {
     padding: "2rem 1.5rem 1.5rem 1.5rem",
   },
@@ -14,7 +13,6 @@ const styles = {
     color: "#fff",
     marginBottom: "1.5rem",
   },
-  // Card dan Form Layout
   card: {
     backgroundColor: "#2C3150",
     borderRadius: "12px",
@@ -24,8 +22,8 @@ const styles = {
   },
   formGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "1.5rem 2rem",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "1rem",
   },
   formElement: {
     display: "flex",
@@ -44,15 +42,17 @@ const styles = {
     backgroundColor: "#3A4068",
     color: "white",
     fontSize: "0.9rem",
-    appearance: "none",
-    width: "100%",
-    boxSizing: "border-box",
   },
   textareaField: {
+    padding: "0.6rem 0.8rem",
+    borderRadius: "8px",
+    border: "1px solid #3A4068",
+    backgroundColor: "#3A4068",
+    color: "white",
+    fontSize: "0.9rem",
     resize: "vertical",
     minHeight: "80px",
   },
-  // Style untuk Tombol
   btn: {
     padding: "0.6rem 1rem",
     borderRadius: "8px",
@@ -63,33 +63,24 @@ const styles = {
     transition: "background-color 0.2s",
   },
   btnApprove: {
-    backgroundColor: "#4CAF50", // Hijau
+    backgroundColor: "#4CAF50",
     color: "white",
     padding: "0.4rem 0.8rem",
+    fontSize: "0.85rem",
   },
   btnReject: {
-    backgroundColor: "#FF6347", // Merah
+    backgroundColor: "#FF6347",
     color: "white",
     padding: "0.4rem 0.8rem",
     marginLeft: "0.5rem",
+    fontSize: "0.85rem",
   },
   btnAjukan: {
     backgroundColor: "#5C54A4",
     color: "white",
     padding: "0.8rem 1.5rem",
+    gridColumn: "1 / -1",
   },
-  // Style Info Box (Disamakan dengan Dark Theme)
-  infoBoxAdmin: {
-    backgroundColor: "#4A2A2A", // Merah Gelap
-    borderColor: "#FF6347",
-    color: "rgba(255, 255, 255, 0.8)",
-  },
-  infoBoxHR: {
-    backgroundColor: "#3A4068", // Biru Gelap
-    borderColor: "#00BCD4",
-    color: "rgba(255, 255, 255, 0.8)",
-  },
-  // Tabel Styling
   table: {
     width: "100%",
     borderCollapse: "collapse",
@@ -111,347 +102,286 @@ const styles = {
     borderBottom: "1px solid #3A4068",
   },
 };
-// --- End Inline Styles ---
 
-export default function Cuti() {
-  const [employees, setEmployees] = useState([]);
+export default function Leave() {
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { user } = useAuth();
 
-  const isAdmin = user.role === "Admin";
-  const isApprover = isAdmin || user.role === "HR";
-  const canSelectOtherEmployee = isAdmin;
-
-  const [form, setForm] = useState({
-    employee_id: canSelectOtherEmployee ? "" : user.username,
-    tanggal_pengajuan: "",
+  // State untuk form pengajuan
+  const [newLeaveData, setNewLeaveData] = useState({
     tanggal_mulai: "",
     tanggal_selesai: "",
     jenis_pengajuan: "Cuti",
     alasan: "",
-    status: "pending",
+    employee_id: user?.employee_id || "",
   });
 
-  const refresh = () => setList(api.leave.findAll());
+  const fetchLeaveRequests = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // ✅ Ambil semua data leave
+      let data = await leave.findAll();
+
+      // Filter di frontend berdasarkan role
+      if (user && (user.role === "Admin" || user.role === "HR")) {
+        // Admin/HR melihat semua
+        setList(data);
+      } else if (user && user.employee_id) {
+        // Karyawan hanya melihat milik sendiri
+        const myLeaves = data.filter((l) => l.employee_id === user.employee_id);
+        setList(myLeaves);
+      } else {
+        setList([]);
+      }
+    } catch (e) {
+      setError(e.message);
+      console.error("Gagal memuat data cuti:", e);
+      setList([]); // Set empty array saat error
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    setEmployees(api.employees.findAll());
-    refresh();
-  }, []);
+    if (user) {
+      fetchLeaveRequests();
+    }
+  }, [user, fetchLeaveRequests]);
 
-  const submit = (e) => {
+  const handleFormChange = (e) => {
+    setNewLeaveData({ ...newLeaveData, [e.target.name]: e.target.value });
+  };
+
+  // Fungsi pengajuan cuti
+  const handleSubmitLeave = async (e) => {
     e.preventDefault();
+    setError(null);
 
-    if (isAdmin) {
-      alert(
-        "Admin tidak dapat mengajukan cuti/izin/sakit. Anda hanya dapat menyetujui atau menolak pengajuan."
-      );
+    if (!user?.employee_id) {
+      alert("Employee ID tidak ditemukan. Silakan login ulang.");
       return;
     }
 
-    if (!form.employee_id) {
-      alert(
-        "Pilih karyawan atau pastikan Anda memiliki ID karyawan untuk mengajukan cuti."
-      );
-      return;
-    }
+    try {
+      await leave.create({
+        ...newLeaveData,
+        employee_id: user.employee_id,
+      });
 
-    if (
-      !form.tanggal_pengajuan ||
-      !form.tanggal_mulai ||
-      !form.tanggal_selesai ||
-      !form.alasan
-    ) {
-      alert("Semua field wajib diisi.");
-      return;
-    }
+      alert("✅ Pengajuan cuti berhasil dikirim!");
+      fetchLeaveRequests();
 
-    const employeeData = api.employees.findById(form.employee_id);
-
-    api.leave.create({
-      ...form,
-      role: employeeData?.role || user.role,
-    });
-
-    setForm({
-      employee_id: canSelectOtherEmployee ? "" : user.username,
-      tanggal_pengajuan: "",
-      tanggal_mulai: "",
-      tanggal_selesai: "",
-      jenis_pengajuan: "Cuti",
-      alasan: "",
-      status: "pending",
-    });
-    refresh();
-  };
-
-  const approve = (id, s) => {
-    if (!isApprover) return;
-    api.leave.update(id, { status: s });
-    refresh();
-  };
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case "approved":
-        return { color: "#90EE90", fontWeight: "bold" };
-      case "rejected":
-        return { color: "#FF6347", fontWeight: "bold" };
-      case "pending":
-      default:
-        return { color: "#FFD700", fontWeight: "bold" };
+      // Reset form
+      setNewLeaveData({
+        ...newLeaveData,
+        tanggal_mulai: "",
+        tanggal_selesai: "",
+        alasan: "",
+      });
+    } catch (e) {
+      setError("Gagal mengajukan cuti: " + e.message);
+      alert("❌ Gagal mengajukan cuti: " + e.message);
     }
   };
+
+  // Fungsi update status (Admin/HR)
+  const handleUpdateStatus = async (leaveId, status) => {
+    setError(null);
+    try {
+      await leave.updateStatus(leaveId, status);
+      alert(`✅ Status cuti berhasil diperbarui menjadi ${status}.`);
+      fetchLeaveRequests();
+    } catch (e) {
+      setError("Gagal memperbarui status cuti: " + e.message);
+      alert("❌ Gagal memperbarui status: " + e.message);
+    }
+  };
+
+  // Tampilkan Loading/Error
+  if (loading) {
+    return <div style={styles.mainContainer}>Memuat data cuti...</div>;
+  }
+
+  const isAdminOrHR = user && (user.role === "Admin" || user.role === "HR");
 
   return (
     <div style={styles.mainContainer}>
-      <h1 style={styles.title}>Cuti, Izin & Sakit</h1>
+      <h1 style={styles.title}>📋 Pengajuan Cuti</h1>
 
-      {/* Form hanya ditampilkan untuk HR dan Karyawan (!isAdmin) */}
-      {!isAdmin && (
-        <form style={{ ...styles.card, ...styles.formGrid }} onSubmit={submit}>
-          <h3
-            style={{
-              gridColumn: "1 / -1",
-              marginTop: 0,
-              color: "#fff",
-              fontSize: "1.2rem",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Ajukan Cuti / Izin / Sakit
-          </h3>
+      {/* Form Pengajuan Cuti */}
+      <div style={styles.card}>
+        <h3
+          style={{
+            marginTop: 0,
+            color: "#fff",
+            fontSize: "1.2rem",
+            marginBottom: "1rem",
+          }}
+        >
+          ➕ Ajukan Cuti Baru
+        </h3>
 
-          {/* Dropdown Jenis Pengajuan */}
+        <form onSubmit={handleSubmitLeave} style={styles.formGrid}>
+          <div style={styles.formElement}>
+            <label style={styles.label}>Tanggal Mulai</label>
+            <input
+              type="date"
+              name="tanggal_mulai"
+              value={newLeaveData.tanggal_mulai}
+              onChange={handleFormChange}
+              style={styles.inputField}
+              required
+            />
+          </div>
+
+          <div style={styles.formElement}>
+            <label style={styles.label}>Tanggal Selesai</label>
+            <input
+              type="date"
+              name="tanggal_selesai"
+              value={newLeaveData.tanggal_selesai}
+              onChange={handleFormChange}
+              style={styles.inputField}
+              required
+            />
+          </div>
+
           <div style={styles.formElement}>
             <label style={styles.label}>Jenis Pengajuan</label>
             <select
-              style={styles.inputField}
               name="jenis_pengajuan"
-              value={form.jenis_pengajuan}
-              onChange={handleChange}
+              value={newLeaveData.jenis_pengajuan}
+              onChange={handleFormChange}
+              style={styles.inputField}
             >
-              <option value="Cuti">Cuti</option>
-              <option value="Izin">Izin</option>
+              <option value="Cuti">Cuti Tahunan</option>
               <option value="Sakit">Sakit</option>
+              <option value="Izin">Izin Khusus</option>
             </select>
           </div>
 
-          {/* Logika tampilan Field Karyawan */}
-          {canSelectOtherEmployee ? (
-            // Tampilkan dropdown untuk Admin
-            <div style={styles.formElement}>
-              <label style={styles.label}>Karyawan</label>
-              <select
-                style={styles.inputField}
-                name="employee_id"
-                value={form.employee_id}
-                onChange={handleChange}
-              >
-                <option value="">- pilih -</option>
-                {employees.map((e) => (
-                  <option key={e.employee_id} value={e.employee_id}>
-                    {e.nama_lengkap}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            // Tampilkan nama karyawan/HR yang sedang login (untuk Karyawan & HR)
-            <div style={styles.formElement}>
-              <label style={styles.label}>Karyawan</label>
-              <p
-                style={{
-                  ...styles.inputField,
-                  padding: "0.6rem 0.8rem",
-                  backgroundColor: "#3A4068",
-                  color: "#fff",
-                  height: "auto",
-                  margin: 0,
-                }}
-              >
-                {user.nama_lengkap || user.username}
-              </p>
-            </div>
-          )}
-
-          {/* Field Tanggal Pengajuan */}
-          <div style={styles.formElement}>
-            <label style={styles.label}>Tanggal Pengajuan</label>
-            <input
-              style={styles.inputField}
-              type="date"
-              name="tanggal_pengajuan"
-              value={form.tanggal_pengajuan}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Field Tanggal Mulai */}
-          <div style={styles.formElement}>
-            <label style={styles.label}>Mulai</label>
-            <input
-              style={styles.inputField}
-              type="date"
-              name="tanggal_mulai"
-              value={form.tanggal_mulai}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Field Tanggal Selesai */}
-          <div style={styles.formElement}>
-            <label style={styles.label}>Selesai</label>
-            <input
-              style={styles.inputField}
-              type="date"
-              name="tanggal_selesai"
-              value={form.tanggal_selesai}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Field Alasan (Mengambil dua kolom) */}
-          <div style={{ ...styles.formElement, gridColumn: "1 / 3" }}>
-            <label style={styles.label}>Alasan / Keterangan</label>
+          <div style={{ ...styles.formElement, gridColumn: "1 / -1" }}>
+            <label style={styles.label}>Alasan</label>
             <textarea
-              style={{ ...styles.inputField, ...styles.textareaField }}
-              rows={2}
               name="alasan"
-              value={form.alasan}
-              onChange={handleChange}
+              placeholder="Jelaskan alasan pengajuan cuti..."
+              value={newLeaveData.alasan}
+              onChange={handleFormChange}
+              style={styles.textareaField}
+              required
             />
           </div>
 
-          {/* Tombol Ajukan (Mengambil satu kolom di baris terakhir) */}
+          <button type="submit" style={{ ...styles.btn, ...styles.btnAjukan }}>
+            📤 Ajukan Cuti
+          </button>
+        </form>
+
+        {error && (
           <div
             style={{
-              ...styles.formElement,
-              flexDirection: "row",
-              alignItems: "flex-end",
-              justifyContent: "flex-end",
+              marginTop: "1rem",
+              padding: "0.8rem",
+              backgroundColor: "#4A2A2A",
+              borderRadius: "8px",
+              color: "#FF6347",
             }}
           >
-            <button
-              style={{ ...styles.btn, ...styles.btnAjukan }}
-              type="submit"
-            >
-              Ajukan
-            </button>
+            ⚠️ {error}
           </div>
-        </form>
-      )}
+        )}
+      </div>
 
-      {/* Kotak Informasi (Disesuaikan dengan Dark Theme) */}
-      {isAdmin && (
-        <div
-          style={{
-            ...styles.card,
-            ...styles.infoBox,
-            ...styles.infoBoxAdmin,
-            borderLeft: "4px solid #FF6347",
-          }}
-        >
-          <p style={{ margin: 0, color: "rgba(255, 255, 255, 0.8)" }}>
-            ⚠️ Anda login sebagai **{user.role}**. Anda hanya dapat menyetujui
-            atau menolak pengajuan, **tidak dapat mengajukan cuti/izin/sakit.**
-          </p>
-        </div>
-      )}
-
-      {user.role === "HR" && (
-        <div
-          style={{
-            ...styles.card,
-            ...styles.infoBox,
-            ...styles.infoBoxHR,
-            borderLeft: "4px solid #00BCD4",
-          }}
-        >
-          <p style={{ margin: 0, color: "rgba(255, 255, 255, 0.8)" }}>
-            ℹ️ Anda login sebagai **HR**. Anda dapat mengajukan permohonan di
-            atas dan juga dapat menyetujui atau menolak pengajuan dari karyawan.
-          </p>
-        </div>
-      )}
-
-      {/* Tabel Pengajuan */}
-      <div style={{ ...styles.card, padding: "0" }}>
+      {/* Tabel Daftar Pengajuan */}
+      <div style={{ ...styles.card, padding: 0 }}>
         <table style={styles.table}>
           <thead style={styles.tableHeader}>
             <tr>
-              <th style={styles.th}>Tgl Ajukan</th>
-              <th style={styles.th}>Nama</th>
+              <th style={styles.th}>ID</th>
+              {isAdminOrHR && <th style={styles.th}>Karyawan</th>}
               <th style={styles.th}>Jenis</th>
-              <th style={styles.th}>Periode</th>
+              <th style={styles.th}>Mulai</th>
+              <th style={styles.th}>Selesai</th>
               <th style={styles.th}>Alasan</th>
               <th style={styles.th}>Status</th>
-              <th style={styles.th}>Role</th>
-              <th style={styles.th}>Aksi</th>
+              {isAdminOrHR && <th style={styles.th}>Aksi</th>}
             </tr>
           </thead>
           <tbody>
-            {list.map((l) => {
-              const emp = api.employees.findById(l.employee_id);
-              return (
-                <tr
-                  key={l.leave_id}
-                  style={{ borderBottom: "1px solid #3A4068" }}
-                >
-                  <td style={styles.td}>{l.tanggal_pengajuan}</td>
-                  <td style={styles.td}>
-                    {emp?.nama_lengkap || l.employee_id}
-                  </td>
-                  <td style={styles.td}>{l.jenis_pengajuan || "Cuti"}</td>
-                  <td style={styles.td}>
-                    {l.tanggal_mulai} → {l.tanggal_selesai}
-                  </td>
-                  <td style={styles.td}>{l.alasan}</td>
-                  <td style={{ ...styles.td, ...getStatusStyle(l.status) }}>
-                    {l.status}
-                  </td>
-                  <td style={styles.td}>
-                    {l.role || emp?.role || "Tidak Diketahui"}
-                  </td>
-
-                  {/* Aksi Approve/Reject */}
-                  <td
-                    style={{
-                      ...styles.td,
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    {isApprover && l.status === "pending" && (
-                      <>
-                        <button
-                          style={{ ...styles.btn, ...styles.btnApprove }}
-                          onClick={() => approve(l.leave_id, "approved")}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          style={{ ...styles.btn, ...styles.btnReject }}
-                          onClick={() => approve(l.leave_id, "rejected")}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-            {list.length === 0 && (
+            {list.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ ...styles.td, textAlign: "center" }}>
-                  <i>Belum ada pengajuan.</i>
+                <td
+                  colSpan={isAdminOrHR ? 8 : 6}
+                  style={{ ...styles.td, textAlign: "center", color: "#999" }}
+                >
+                  <i>Belum ada data cuti.</i>
                 </td>
               </tr>
+            ) : (
+              list.map((l) => (
+                <tr key={l.leave_id}>
+                  <td style={styles.td}>{l.leave_id}</td>
+                  {isAdminOrHR && (
+                    <td style={styles.td}>
+                      {l.employee?.nama_lengkap || "N/A"}
+                    </td>
+                  )}
+                  <td style={styles.td}>{l.jenis_pengajuan}</td>
+                  <td style={styles.td}>
+                    {new Date(l.tanggal_mulai).toLocaleDateString("id-ID")}
+                  </td>
+                  <td style={styles.td}>
+                    {new Date(l.tanggal_selesai).toLocaleDateString("id-ID")}
+                  </td>
+                  <td style={styles.td}>{l.alasan}</td>
+                  <td style={styles.td}>
+                    <span
+                      style={{
+                        color:
+                          l.status === "approved"
+                            ? "#4CAF50"
+                            : l.status === "pending"
+                            ? "#FFA726"
+                            : "#FF6347",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {l.status.toUpperCase()}
+                    </span>
+                  </td>
+                  {isAdminOrHR && (
+                    <td style={styles.td}>
+                      {l.status === "pending" ? (
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button
+                            onClick={() =>
+                              handleUpdateStatus(l.leave_id, "approved")
+                            }
+                            style={{ ...styles.btn, ...styles.btnApprove }}
+                          >
+                            ✓ Setujui
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleUpdateStatus(l.leave_id, "rejected")
+                            }
+                            style={{ ...styles.btn, ...styles.btnReject }}
+                          >
+                            ✗ Tolak
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: "#999", fontSize: "0.85rem" }}>
+                          Selesai
+                        </span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))
             )}
           </tbody>
         </table>

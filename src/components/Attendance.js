@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import * as api from "../services/api";
+import { attendance, employee } from "../services/api";
 
-// --- Inline Styles untuk Kerapian dan Konsistensi ---
+// --- Inline Styles ---
 const styles = {
-  // Global Padding
   mainContainer: {
     padding: "2rem 1.5rem 1.5rem 1.5rem",
   },
@@ -14,7 +13,6 @@ const styles = {
     color: "#fff",
     marginBottom: "1.5rem",
   },
-  // Form Manual Admin (Card)
   card: {
     backgroundColor: "#2C3150",
     borderRadius: "12px",
@@ -22,13 +20,11 @@ const styles = {
     padding: "1.5rem",
     marginBottom: "1.5rem",
   },
-  // Grid layout untuk form manual
   formGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
     gap: "1.5rem 2rem",
   },
-  // Style untuk Label dan Input/Select
   formElement: {
     display: "flex",
     flexDirection: "column",
@@ -46,9 +42,7 @@ const styles = {
     backgroundColor: "#3A4068",
     color: "white",
     fontSize: "0.9rem",
-    appearance: "none",
   },
-  // Tombol Submit
   btnPrimary: {
     padding: "0.6rem 1rem",
     borderRadius: "8px",
@@ -59,7 +53,6 @@ const styles = {
     backgroundColor: "#5C54A4",
     color: "#fff",
   },
-  // Tabel Styling
   table: {
     width: "100%",
     borderCollapse: "collapse",
@@ -80,7 +73,6 @@ const styles = {
     fontSize: "0.9rem",
     borderBottom: "1px solid #3A4068",
   },
-  // Quick Absen Styling
   quickAbsenCard: {
     backgroundColor: "#2C3150",
     borderRadius: "12px",
@@ -129,25 +121,26 @@ const styles = {
     animation: "spin 1s linear infinite",
   },
 };
-// --- End Inline Styles ---
 
 export default function Attendance() {
-  const [employees, setEmployees] = useState([]);
+  const [employeesData, setEmployeesData] = useState([]);
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { user } = useAuth();
 
-  const isAdmin = user.role === "Admin";
-  const isApprover = user.role === "HR";
-  const loggedInEmployeeId = user.employee_id || user.username;
-
-  const canSeeAllData = isAdmin || user.role === "HR";
+  const isAdmin = user?.role === "Admin";
+  const loggedInEmployeeId = user?.employee_id || user?.username;
+  const canSeeAllData = isAdmin || user?.role === "HR";
   const canSeeAllDataAndInputForAll = isAdmin;
 
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState(null);
-  const [watchId, setWatchId] = useState(null);
+
+  // ✅ PERBAIKAN: Gunakan useRef untuk watchId agar tidak trigger re-render
+  const watchIdRef = useRef(null);
 
   const [form, setForm] = useState({
     employee_id: canSeeAllDataAndInputForAll ? "" : loggedInEmployeeId || "",
@@ -158,45 +151,88 @@ export default function Attendance() {
     tipe_kerja: "WFO",
   });
 
-  const refresh = () => {
-    let allAttendance = api.attendance.findAll();
-
-    if (!canSeeAllData && loggedInEmployeeId) {
-      allAttendance = allAttendance.filter(
-        (a) => a.employee_id === loggedInEmployeeId
+  // Fungsi pemeriksaan absen hari ini
+  const checkTodayAttendance = useCallback(
+    (allAttendance) => {
+      const today = new Date().toISOString().split("T")[0];
+      const todayData = allAttendance.find(
+        (a) =>
+          a.employee_id === loggedInEmployeeId &&
+          a.tanggal.split("T")[0] === today
       );
-    }
-    setList(allAttendance);
-    checkTodayAttendance(allAttendance);
-  };
+      setTodayAttendance(todayData || null);
+    },
+    [loggedInEmployeeId]
+  );
 
-  const checkTodayAttendance = (allAttendance) => {
-    const today = new Date().toISOString().split("T")[0];
-    const todayData = allAttendance.find(
-      (a) => a.employee_id === loggedInEmployeeId && a.tanggal === today
-    );
-    setTodayAttendance(todayData || null);
-  };
+  // ✅ PERBAIKAN: Fungsi refresh yang digabungkan dan sudah lengkap
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log("🔄 Refreshing data...");
 
-  useEffect(() => {
-    setEmployees(api.employees.findAll());
-    refresh();
+      // ✅ FIX: Fetch attendance terlebih dahulu (semua role bisa akses)
+      const allAttendance = await attendance.findAll();
+      console.log("✅ Attendance loaded:", allAttendance.length);
 
-    // Auto-start location tracking untuk non-admin
-    if (!isAdmin) {
-      startLocationTracking();
-    }
-
-    // Cleanup saat component unmount
-    return () => {
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
+      // ✅ FIX: Hanya fetch employees jika Admin/HR (punya akses)
+      let allEmployees = [];
+      if (canSeeAllData) {
+        try {
+          // Hanya gunakan .findAll() karena API service sudah handle .data
+          allEmployees = await employee.findAll();
+          console.log("✅ Employees loaded:", allEmployees.length);
+        } catch (empError) {
+          console.log(
+            "⚠️ Could not load employees (normal for Karyawan):",
+            empError.message
+          );
+          // Tidak perlu throw error, karena Karyawan memang tidak perlu data employees
+        }
       }
-    };
-  }, [isAdmin, loggedInEmployeeId, user.role]);
 
-  // ============= AUTO LOCATION TRACKING =============
-  const startLocationTracking = () => {
+      // Filter attendance berdasarkan role
+      let filteredAttendance = allAttendance;
+      if (!canSeeAllData && loggedInEmployeeId) {
+        filteredAttendance = allAttendance.filter(
+          (a) => a.employee_id === loggedInEmployeeId
+        );
+      }
+
+      setEmployeesData(allEmployees);
+      setList(filteredAttendance);
+      checkTodayAttendance(filteredAttendance);
+    } catch (e) {
+      let errorMessage = "Gagal memuat data absensi.";
+
+      if (e.response) {
+        const statusCode = e.response.status;
+        const detailMessage =
+          e.response.data?.message || e.response.data?.error || "Server Error";
+
+        if (statusCode === 401 || statusCode === 403) {
+          errorMessage = `Error ${statusCode}: Akses Ditolak (${detailMessage})`;
+        } else {
+          errorMessage = `Error ${statusCode}: ${detailMessage}`;
+        }
+        console.error("API Response Error:", e.response.data);
+      } else if (e.request) {
+        errorMessage =
+          "Tidak ada respons dari server. Pastikan Backend berjalan di http://localhost:5000";
+      } else {
+        errorMessage = e.message || "Kesalahan internal saat memuat data.";
+      }
+
+      setError(errorMessage);
+      console.error("❌ Error loading data:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [canSeeAllData, loggedInEmployeeId, checkTodayAttendance]); // Dependencies sudah benar
+
+  // ✅ PERBAIKAN: Fungsi location tracking yang tidak menyebabkan loop
+  const startLocationTracking = useCallback(() => {
     if (!navigator.geolocation) {
       setLocationError("Browser Anda tidak mendukung Geolocation");
       return;
@@ -204,47 +240,127 @@ export default function Attendance() {
 
     setLocationLoading(true);
 
-    // Watch position untuk update realtime
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        const location = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: new Date().toISOString(),
-        };
-        setCurrentLocation(location);
-        setLocationLoading(false);
-        setLocationError(null);
-      },
-      (error) => {
-        setLocationLoading(false);
-        let errorMessage = "Gagal mendapatkan lokasi";
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage =
-              "Akses lokasi ditolak. Mohon izinkan akses lokasi di browser Anda untuk menggunakan fitur absensi.";
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage =
-              "Informasi lokasi tidak tersedia. Pastikan GPS perangkat Anda aktif.";
-            break;
-          case error.TIMEOUT:
-            errorMessage =
-              "Waktu habis saat mencoba mendapatkan lokasi. Coba refresh halaman.";
-            break;
-        }
-        setLocationError(errorMessage);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000, // Cache location for 5 seconds
-      }
-    );
+    // Hentikan watch yang lama
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
 
-    setWatchId(id);
-  };
+    // Opsi maksimal untuk akurasi tinggi
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 30000,
+      maximumAge: 0,
+    };
+
+    let bestAccuracy = Infinity;
+    let bestLocation = null;
+    let attempts = 0;
+    const maxAttempts = 5;
+    const targetAccuracy = 30; // Target akurasi 30m
+
+    console.log("🔍 Starting GPS lock... (target: <30m accuracy)");
+
+    const tryGetBetterLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          attempts++;
+          const accuracy = position.coords.accuracy;
+
+          console.log(
+            `📍 Attempt ${attempts}/${maxAttempts}: Accuracy ${Math.round(
+              accuracy
+            )}m`
+          );
+
+          // Update jika dapat akurasi lebih baik
+          if (accuracy < bestAccuracy) {
+            bestAccuracy = accuracy;
+            bestLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: accuracy,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Update UI dengan lokasi terbaru
+            setCurrentLocation(bestLocation);
+            setLocationLoading(false);
+            setLocationError(null);
+          }
+
+          // Jika sudah dapat akurasi bagus atau sudah max attempts
+          if (accuracy <= targetAccuracy || attempts >= maxAttempts) {
+            console.log(
+              `✅ GPS locked! Final accuracy: ${Math.round(bestAccuracy)}m`
+            );
+            setLocationLoading(false);
+
+            // Start watching untuk real-time updates
+            startWatchingLocation();
+          } else {
+            // Coba lagi setelah 2 detik
+            setTimeout(tryGetBetterLocation, 2000);
+          }
+        },
+        (error) => {
+          setLocationLoading(false);
+          let errorMessage = "Gagal mendapatkan lokasi";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage =
+                "Akses lokasi ditolak. Izinkan akses lokasi di browser.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage =
+                "GPS tidak tersedia. Pastikan GPS aktif dan Anda di area terbuka.";
+              break;
+            case error.TIMEOUT:
+              errorMessage = "GPS timeout. Tunggu di area terbuka lebih lama.";
+              break;
+            default:
+              errorMessage = "Error GPS.";
+          }
+          setLocationError(errorMessage);
+          console.error("❌ GPS error:", error);
+        },
+        options
+      );
+    };
+
+    const startWatchingLocation = () => {
+      const id = navigator.geolocation.watchPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString(),
+          };
+
+          // Update hanya jika akurasi membaik
+          if (position.coords.accuracy < bestAccuracy) {
+            bestAccuracy = position.coords.accuracy;
+            setCurrentLocation(location);
+            console.log(
+              "📍 Location improved:",
+              Math.round(position.coords.accuracy),
+              "m"
+            );
+          }
+        },
+        (error) => {
+          console.error("Watch error:", error);
+        },
+        options
+      );
+
+      watchIdRef.current = id;
+    };
+
+    // Mulai proses mendapatkan lokasi terbaik
+    tryGetBetterLocation();
+  }, []);
+  // ✅ Empty dependencies - hanya dibuat sekali
 
   const retryLocation = () => {
     setLocationError(null);
@@ -252,8 +368,30 @@ export default function Attendance() {
     startLocationTracking();
   };
 
-  // ============= ATTENDANCE FUNCTIONS WITH LOCATION =============
-  const absenMasuk = () => {
+  // ✅ PERBAIKAN: UseEffect yang tidak menyebabkan infinite loop
+  useEffect(() => {
+    console.log("🔵 Component mounted, loading data...");
+    console.log("👤 Current user:", user);
+    console.log("🔑 Token:", localStorage.getItem("hr_userToken"));
+
+    refresh();
+
+    // Start location tracking untuk non-admin
+    if (!isAdmin) {
+      startLocationTracking();
+    }
+
+    // Cleanup function
+    return () => {
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        console.log("🧹 Cleanup: Location tracking stopped");
+      }
+    };
+  }, [isAdmin, refresh, startLocationTracking, user]); // Tambahkan dependencies yang benar
+
+  // Fungsi absen masuk
+  const absenMasuk = async () => {
     if (!currentLocation) {
       alert(
         "⚠️ Lokasi belum terdeteksi. Mohon tunggu beberapa saat atau izinkan akses lokasi."
@@ -267,29 +405,43 @@ export default function Attendance() {
     ).padStart(2, "0")}`;
     const today = now.toISOString().split("T")[0];
 
-    api.attendance.create({
-      employee_id: loggedInEmployeeId,
-      tanggal: today,
-      jam_masuk: currentTime,
-      jam_pulang: "",
-      status: "hadir",
-      tipe_kerja: form.tipe_kerja,
-      recorded_by_role: user.role,
-      lokasi_masuk: `${currentLocation.latitude},${currentLocation.longitude}`,
-      akurasi_masuk: Math.round(currentLocation.accuracy),
-    });
+    // ✅ FORMAT LOKASI: "latitude,longitude"
+    const lokasiMasuk = `${currentLocation.latitude},${currentLocation.longitude}`;
+    const akurasiMasuk = Math.round(currentLocation.accuracy);
 
-    alert(
-      `✓ Absen Masuk berhasil pada ${currentTime}\n📍 Lokasi: ${currentLocation.latitude.toFixed(
-        6
-      )}, ${currentLocation.longitude.toFixed(6)}\n📏 Akurasi: ${Math.round(
-        currentLocation.accuracy
-      )}m`
-    );
-    refresh();
+    console.log("📤 Sending attendance data:");
+    console.log("  - employee_id:", loggedInEmployeeId);
+    console.log("  - lokasi_masuk:", lokasiMasuk);
+    console.log("  - akurasi_masuk:", akurasiMasuk);
+
+    try {
+      const response = await attendance.create({
+        employee_id: loggedInEmployeeId,
+        tanggal: today,
+        jam_masuk: currentTime,
+        jam_pulang: null,
+        status: "hadir",
+        tipe_kerja: form.tipe_kerja,
+        recorded_by_role: user.role,
+        lokasi_masuk: lokasiMasuk, // ✅ PENTING!
+        akurasi_masuk: akurasiMasuk, // ✅ PENTING!
+      });
+
+      console.log("✅ Attendance created:", response);
+      alert(
+        `✓ Absen Masuk berhasil pada ${currentTime}\nLokasi: ${lokasiMasuk}\nAkurasi: ${akurasiMasuk}m`
+      );
+      refresh();
+    } catch (e) {
+      console.error("❌ Error creating attendance:", e);
+      console.error("   Response data:", e.response?.data);
+      setError(e.message || "Gagal Absen Masuk.");
+      alert("Gagal Absen Masuk: " + (e.response?.data?.error || e.message));
+    }
   };
 
-  const absenPulang = () => {
+  // Fungsi absen pulang
+  const absenPulang = async () => {
     if (!todayAttendance) {
       alert("⚠️ Anda belum absen masuk hari ini!");
       return;
@@ -307,23 +459,23 @@ export default function Attendance() {
       now.getMinutes()
     ).padStart(2, "0")}`;
 
-    api.attendance.update(todayAttendance.attendance_id, {
-      jam_pulang: currentTime,
-      lokasi_pulang: `${currentLocation.latitude},${currentLocation.longitude}`,
-      akurasi_pulang: Math.round(currentLocation.accuracy),
-    });
+    try {
+      await attendance.update(todayAttendance.attendance_id, {
+        jam_pulang: currentTime,
+        lokasi_pulang: `${currentLocation.latitude},${currentLocation.longitude}`,
+        akurasi_pulang: Math.round(currentLocation.accuracy),
+      });
 
-    alert(
-      `✓ Absen Pulang berhasil pada ${currentTime}\n📍 Lokasi: ${currentLocation.latitude.toFixed(
-        6
-      )}, ${currentLocation.longitude.toFixed(6)}\n📏 Akurasi: ${Math.round(
-        currentLocation.accuracy
-      )}m`
-    );
-    refresh();
+      alert(`✓ Absen Pulang berhasil pada ${currentTime}`);
+      refresh();
+    } catch (e) {
+      setError(e.message || "Gagal Absen Pulang.");
+      alert("Gagal Absen Pulang: " + (e.response?.data?.error || e.message));
+    }
   };
 
-  const submitManual = (e) => {
+  // Submit manual
+  const submitManual = async (e) => {
     e.preventDefault();
 
     let finalEmployeeId = form.employee_id;
@@ -336,21 +488,31 @@ export default function Attendance() {
       return;
     }
 
-    api.attendance.create({
-      ...form,
-      employee_id: finalEmployeeId,
-      recorded_by_role: user.role,
-    });
+    try {
+      await attendance.create({
+        ...form,
+        employee_id: finalEmployeeId,
+        recorded_by_role: user.role,
+        lokasi_masuk: "MANUAL",
+        akurasi_masuk: 0,
+      });
 
-    setForm({
-      employee_id: canSeeAllDataAndInputForAll ? "" : loggedInEmployeeId || "",
-      tanggal: new Date().toISOString().split("T")[0],
-      jam_masuk: "",
-      jam_pulang: "",
-      status: "hadir",
-      tipe_kerja: "WFO",
-    });
-    refresh();
+      setForm({
+        employee_id: canSeeAllDataAndInputForAll
+          ? ""
+          : loggedInEmployeeId || "",
+        tanggal: new Date().toISOString().split("T")[0],
+        jam_masuk: "",
+        jam_pulang: "",
+        status: "hadir",
+        tipe_kerja: "WFO",
+      });
+      refresh();
+      alert("✅ Absensi manual berhasil dicatat.");
+    } catch (e) {
+      setError(e.message || "Gagal mencatat absensi manual.");
+      alert("Gagal mencatat manual: " + (e.response?.data?.error || e.message));
+    }
   };
 
   const getCurrentTime = () => {
@@ -360,9 +522,45 @@ export default function Attendance() {
     ).padStart(2, "0")}`;
   };
 
+  // Helper untuk mencari employee by ID
+  const findEmployeeById = (empId) => {
+    return employeesData.find((e) => e.employee_id === empId);
+  };
+
+  // Helper untuk membuat URL Google Maps yang benar
+  const createMapUrl = (locationString) => {
+    if (!locationString || locationString === "MANUAL") return null;
+    return `https://www.google.com/maps/search/?api=1&query=${locationString}`;
+  };
+
+  if (loading) {
+    return (
+      <div style={styles.mainContainer}>
+        <div style={{ color: "#fff", fontSize: "1.2rem" }}>
+          ⏳ Memuat data absensi...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.mainContainer}>
+        <div style={{ ...styles.card, borderLeft: "4px solid #f44336" }}>
+          <h3 style={{ color: "#fff", marginTop: 0 }}>❌ Error</h3>
+          <p style={{ color: "rgba(255,255,255,0.9)", marginBottom: "1rem" }}>
+            {error}
+          </p>
+          <button onClick={refresh} style={styles.btnPrimary}>
+            🔄 Coba Lagi
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.mainContainer}>
-      {/* CSS Animation untuk spinner */}
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -372,7 +570,7 @@ export default function Attendance() {
 
       <h1 style={styles.title}>Absensi</h1>
 
-      {/* Quick Absen untuk Karyawan & HR (bukan Admin) */}
+      {/* Quick Absen untuk Karyawan & HR */}
       {!isAdmin && (
         <div style={styles.quickAbsenCard}>
           <h3
@@ -391,7 +589,7 @@ export default function Attendance() {
             <div style={styles.locationLoading}>
               <div style={styles.spinner}></div>
               <div style={{ color: "#fff", fontSize: "14px" }}>
-                🔍 Mendeteksi lokasi Anda...
+                📍 Mendeteksi lokasi Anda...
               </div>
             </div>
           )}
@@ -448,14 +646,16 @@ export default function Attendance() {
                   marginBottom: "0.3rem",
                 }}
               >
-                🌐 Koordinat:{" "}
+                🌍 Koordinat:{" "}
                 <a
-                  href={`https://www.google.com/maps?q=${currentLocation.latitude},${currentLocation.longitude}`}
+                  href={createMapUrl(
+                    `${currentLocation.latitude},${currentLocation.longitude}`
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: "#5C9EFF", textDecoration: "underline" }}
                 >
-                  {currentLocation.latitude.toFixed(6)},{" "}
+                  {currentLocation.latitude.toFixed(6)},
                   {currentLocation.longitude.toFixed(6)}
                 </a>
               </div>
@@ -511,7 +711,7 @@ export default function Attendance() {
                 >
                   📍 Lokasi Masuk:{" "}
                   <a
-                    href={`https://www.google.com/maps?q=${todayAttendance.lokasi_masuk}`}
+                    href={createMapUrl(todayAttendance.lokasi_masuk)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "#5C9EFF", textDecoration: "underline" }}
@@ -531,7 +731,7 @@ export default function Attendance() {
                 >
                   📍 Lokasi Pulang:{" "}
                   <a
-                    href={`https://www.google.com/maps?q=${todayAttendance.lokasi_pulang}`}
+                    href={createMapUrl(todayAttendance.lokasi_pulang)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "#5C9EFF", textDecoration: "underline" }}
@@ -544,7 +744,7 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* Pilih Tipe Kerja - hanya muncul jika belum absen masuk */}
+          {/* Pilih Tipe Kerja */}
           {!todayAttendance && (
             <div style={{ marginBottom: "1rem" }}>
               <label style={styles.label}>Tipe Kerja Hari Ini:</label>
@@ -566,7 +766,7 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* Tombol Absen Masuk dan Pulang */}
+          {/* Tombol Absen */}
           <div style={{ display: "flex", gap: "1rem" }}>
             <button
               onClick={absenMasuk}
@@ -652,7 +852,6 @@ export default function Attendance() {
             📝 Input Manual Absensi (Admin)
           </h3>
 
-          {/* Field Karyawan */}
           <div style={styles.formElement}>
             <label style={styles.label}>Karyawan</label>
             <select
@@ -663,7 +862,7 @@ export default function Attendance() {
               }
             >
               <option value="">- pilih -</option>
-              {employees.map((e) => (
+              {employeesData.map((e) => (
                 <option key={e.employee_id} value={e.employee_id}>
                   {e.nama_lengkap}
                 </option>
@@ -680,6 +879,7 @@ export default function Attendance() {
               onChange={(e) => setForm({ ...form, tanggal: e.target.value })}
             />
           </div>
+
           <div style={styles.formElement}>
             <label style={styles.label}>Jam Masuk</label>
             <input
@@ -689,6 +889,7 @@ export default function Attendance() {
               onChange={(e) => setForm({ ...form, jam_masuk: e.target.value })}
             />
           </div>
+
           <div style={styles.formElement}>
             <label style={styles.label}>Jam Pulang</label>
             <input
@@ -698,6 +899,7 @@ export default function Attendance() {
               onChange={(e) => setForm({ ...form, jam_pulang: e.target.value })}
             />
           </div>
+
           <div style={styles.formElement}>
             <label style={styles.label}>Status</label>
             <select
@@ -711,6 +913,7 @@ export default function Attendance() {
               <option>alpa</option>
             </select>
           </div>
+
           <div style={styles.formElement}>
             <label style={styles.label}>Tipe Kerja</label>
             <select
@@ -723,6 +926,7 @@ export default function Attendance() {
               <option value="Hybrid">Hybrid</option>
             </select>
           </div>
+
           <div
             style={{
               ...styles.formElement,
@@ -755,7 +959,7 @@ export default function Attendance() {
           <tbody>
             {list.map((a) => {
               const emp = canSeeAllData
-                ? api.employees.findById(a.employee_id)
+                ? findEmployeeById(a.employee_id)
                 : user;
 
               return (
@@ -763,7 +967,7 @@ export default function Attendance() {
                   key={a.attendance_id}
                   style={{ borderBottom: "1px solid #3A4068" }}
                 >
-                  <td style={styles.td}>{a.tanggal}</td>
+                  <td style={styles.td}>{a.tanggal.split("T")[0]}</td>
                   <td style={styles.td}>
                     {emp?.nama_lengkap || emp?.username || a.employee_id || "-"}
                   </td>
@@ -777,7 +981,7 @@ export default function Attendance() {
                         <div style={{ fontSize: "12px" }}>
                           <div style={{ marginBottom: "4px" }}>
                             <a
-                              href={`https://www.google.com/maps?q=${a.lokasi_masuk}`}
+                              href={createMapUrl(a.lokasi_masuk)}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{
@@ -790,7 +994,7 @@ export default function Attendance() {
                           </div>
                           {a.lokasi_pulang && (
                             <a
-                              href={`https://www.google.com/maps?q=${a.lokasi_pulang}`}
+                              href={createMapUrl(a.lokasi_pulang)}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{

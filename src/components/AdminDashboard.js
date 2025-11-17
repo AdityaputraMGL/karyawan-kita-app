@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { stats } from "../services/api";
 
@@ -11,17 +11,13 @@ export default function AdminDashboard() {
     cutiPending: 0,
     gajiBulanIni: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // ⭐ PERUBAHAN DI SINI: Hanya Admin yang diizinkan melihat AdminDashboard
-  const allowedRoles = ["Admin"];
+  const allowedRoles = ["Admin", "HR"];
 
-  // Mendapatkan nama bulan saat ini dalam Bahasa Indonesia
   const getBulanSekarang = () => {
-    // Asumsi: Kita menggunakan tanggal sistem Anda, atau tanggal referensi 2025-11
     const date = new Date();
-    // Jika Anda ingin mengunci ke 'November 2025' seperti di context, gunakan:
-    // const date = new Date('2025-11-01');
-
     return new Intl.DateTimeFormat("id-ID", {
       month: "long",
       year: "numeric",
@@ -30,16 +26,61 @@ export default function AdminDashboard() {
 
   const bulanSekarang = getBulanSekarang();
 
-  useEffect(() => {
-    if (allowedRoles.includes(user?.role)) {
-      // Catatan: Pastikan fungsi stats() di services/api.js
-      // sudah diperbarui untuk HANYA menghitung gaji pada bulan berjalan.
-      const allStats = stats();
-      setStats(allStats);
+  const formatRupiah = (number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(Number(number) || 0);
+  };
+
+  const fetchStatsData = useCallback(async () => {
+    if (!allowedRoles.includes(user?.role)) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const allStats = await stats.getDashboard();
+
+      // Validasi data yang diterima
+      if (allStats && typeof allStats === "object") {
+        setStats({
+          emp: allStats.emp || 0,
+          hadir: allStats.hadir || 0,
+          izin: allStats.izin || 0,
+          cutiPending: allStats.cutiPending || 0,
+          gajiBulanIni: allStats.gajiBulanIni || 0,
+        });
+      } else {
+        throw new Error("Format data tidak valid dari backend");
+      }
+    } catch (e) {
+      console.error("Dashboard Fetch Error:", e);
+
+      // Fallback ke data dummy jika backend belum siap
+      setStats({
+        emp: 0,
+        hadir: 0,
+        izin: 0,
+        cutiPending: 0,
+        gajiBulanIni: 0,
+      });
+
+      setError(
+        e.message ||
+          "Gagal memuat data dashboard. Backend mungkin belum berjalan."
+      );
+    } finally {
+      setLoading(false);
     }
   }, [user]);
 
-  // Blokir akses jika BUKAN Admin
+  useEffect(() => {
+    if (allowedRoles.includes(user?.role)) {
+      fetchStatsData();
+    }
+  }, [user, fetchStatsData]);
+
   if (!allowedRoles.includes(user?.role)) {
     return (
       <div style={{ padding: "3.5rem 2.5rem 2.5rem 2.5rem" }}>
@@ -53,16 +94,48 @@ export default function AdminDashboard() {
     );
   }
 
-  const formatRupiah = (number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(number);
-  };
+  if (loading) {
+    return (
+      <div style={{ padding: "2rem", color: "white", textAlign: "center" }}>
+        <h1 style={{ fontSize: "2.2rem" }}>Dashboard</h1>
+        <div
+          style={{
+            padding: "2rem",
+            backgroundColor: "#2C3150",
+            borderRadius: "12px",
+            marginTop: "1rem",
+          }}
+        >
+          Memuat data statistik dari backend...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: "2rem", color: "white" }}>
+        <h1 style={{ fontSize: "2.2rem", fontWeight: "700", color: "#FF6347" }}>
+          Dashboard Error
+        </h1>
+        <div
+          style={{
+            padding: "1.5rem",
+            backgroundColor: "#4A2A2A",
+            border: "1px solid #FF6347",
+            borderRadius: "12px",
+          }}
+        >
+          <p style={{ color: "white" }}>Gagal memuat data: {error}</p>
+          <small style={{ color: "#ccc", fontSize: "0.9rem" }}>
+            Pastikan backend berjalan di port 5000 dan Anda login dengan benar.
+          </small>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    // Padding disesuaikan agar ringkas
     <div style={{ padding: "2rem 1.5rem 1.5rem 1.5rem" }}>
       <h1
         style={{
@@ -267,7 +340,6 @@ export default function AdminDashboard() {
               color: "rgba(255, 255, 255, 0.8)",
             }}
           >
-            {/* ⭐ Perubahan di sini: Judul dinamis */}
             Payroll Bulan {bulanSekarang.split(" ")[0]}
           </h3>
           <h1

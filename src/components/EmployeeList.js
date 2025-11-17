@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react"; // ⭐ Tambahkan useCallback
 import { Link, useNavigate } from "react-router-dom";
-import * as api from "../services/api";
+import { employee } from "../services/api"; // ⭐ IMPORT YANG BENAR: employee (singular)
 
 // --- Inline Styles untuk Kerapian dan Ukuran Ramping ---
 const styles = {
@@ -112,46 +112,115 @@ const styles = {
 
 export default function EmployeeList() {
   const [list, setList] = useState([]);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(""); // State untuk Query (Pencarian)
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
-  const [hoveredRow, setHoveredRow] = useState(null); // State untuk hover
+  const [hoveredRow, setHoveredRow] = useState(null);
 
-  const refresh = () => setList(api.employees.findAll(q));
+  // ⭐ FUNGSI REFRESH ASYNCHRONOUS
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // ⭐ Menggunakan employee.findAll() dari API Axios yang baru
+      const data = await employee.findAll(q);
+      setList(data);
+    } catch (e) {
+      setError(e.message || "Gagal memuat data karyawan.");
+      console.error("Gagal memuat data karyawan:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [q]); // Refresh saat q berubah
 
   useEffect(() => {
     refresh();
-  }, [q]);
+  }, [refresh]);
 
-  const del = (id) => {
+  // ⭐ FUNGSI DELETE ASYNCHRONOUS
+  const del = async (id) => {
     if (!window.confirm("Hapus karyawan ini?")) return;
-    api.employees.remove(id);
-    refresh();
+    try {
+      await employee.delete(id); // ⭐ Menggunakan employee.delete()
+      refresh(); // Muat ulang data setelah berhasil dihapus
+    } catch (e) {
+      setError(e.message || "Gagal menghapus karyawan.");
+      console.error("Gagal menghapus karyawan:", e);
+    }
   };
 
-  const exportCSV = () => {
-    /* ... (fungsi exportCSV tidak berubah) ... */
-    const rows = api.employees.findAll().map((e) => ({
-      employee_id: e.employee_id,
-      nama_lengkap: e.nama_lengkap,
-      jabatan: e.jabatan,
-      tanggal_masuk: e.tanggal_masuk,
-      status_karyawan: e.status_karyawan,
-      no_hp: e.no_hp,
-    }));
-    const header = Object.keys(rows[0] || {}).join(",");
-    const body = rows
-      .map((r) =>
-        Object.values(r)
-          .map((v) => `"${(v ?? "").toString().replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\n");
-    const blob = new Blob([header + "\n" + body], { type: "text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "employees.csv";
-    a.click();
+  const exportCSV = async () => {
+    // ⭐ Jadikan async
+    try {
+      // ⭐ Menggunakan employee.findAll()
+      const allEmployees = await employee.findAll();
+
+      const rows = allEmployees.map((e) => ({
+        employee_id: e.employee_id,
+        nama_lengkap: e.nama_lengkap,
+        jabatan: e.jabatan,
+        tanggal_masuk: e.tanggal_masuk,
+        status_karyawan: e.status_karyawan,
+        no_hp: e.no_hp,
+      }));
+
+      const header = Object.keys(rows[0] || {}).join(",");
+      const body = rows
+        .map((r) =>
+          Object.values(r)
+            .map((v) => `"${(v ?? "").toString().replace(/"/g, '""')}"`)
+            .join(",")
+        )
+        .join("\n");
+      const blob = new Blob([header + "\n" + body], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "employees.csv";
+      a.click();
+    } catch (e) {
+      setError(e.message || "Gagal mengekspor data.");
+    }
   };
+
+  // -------------------------------------------------------------
+  // ⭐ TAMPILKAN LOADING ATAU ERROR
+  // -------------------------------------------------------------
+  if (loading) {
+    return (
+      <div style={styles.mainContainer}>
+        <h1 style={styles.title}>Data Karyawan</h1>
+        <div
+          style={{
+            ...styles.card,
+            padding: "20px",
+            textAlign: "center",
+            color: "#ccc",
+          }}
+        >
+          Memuat data...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.mainContainer}>
+        <h1 style={styles.title}>Data Karyawan</h1>
+        <div
+          style={{
+            ...styles.card,
+            padding: "20px",
+            textAlign: "center",
+            color: "#FF6347",
+          }}
+        >
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.mainContainer}>

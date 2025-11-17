@@ -2,7 +2,6 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import * as api from "../services/api";
 
 const styles = {
   mainContainer: {
@@ -78,7 +77,6 @@ const styles = {
     cursor: "pointer",
     border: "none",
     fontSize: "1rem",
-    transition: "all 0.3s ease",
   },
   downloadButton: {
     backgroundColor: "#667eea",
@@ -89,7 +87,6 @@ const styles = {
     cursor: "pointer",
     border: "none",
     fontSize: "1rem",
-    transition: "all 0.3s ease",
   },
   loadingOverlay: {
     position: "fixed",
@@ -113,8 +110,9 @@ export default function PaySlip() {
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [slipData, setSlipData] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Helper untuk memformat Rupiah
   const formatRupiah = (number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -123,7 +121,6 @@ export default function PaySlip() {
     }).format(Number(number) || 0);
   };
 
-  // Helper untuk memformat periode YYYY-MM menjadi Bulan Tahun
   const formatPeriod = (period) => {
     if (!period) return "";
     const [year, month] = period.split("-");
@@ -135,27 +132,91 @@ export default function PaySlip() {
   };
 
   useEffect(() => {
-    const employee = api.employees
-      .findAll()
-      .find((e) => e.user_id === user?.user_id);
+    const fetchPayslipData = async () => {
+      setLoading(true);
+      setError(null);
 
-    if (employee) {
-      const myPayslips = api.payroll
-        .findAll()
-        .filter((p) => p.employee_id === employee.employee_id)
-        .filter((p) => Number(p.total_gaji) > 1000)
-        .sort((a, b) => b.periode.localeCompare(a.periode));
-
-      setAllPayslips(myPayslips);
-
-      if (myPayslips.length > 0) {
-        setSelectedPeriod(myPayslips[0].periode);
-        setSlipData(myPayslips[0]);
-      } else {
-        setSlipData(null);
+      if (!user) {
+        setLoading(false);
+        setError("User belum login.");
+        return;
       }
+
+      try {
+        console.log("Current user:", user);
+
+        // ✅ UBAH: Gunakan endpoint khusus untuk karyawan
+        const token = localStorage.getItem("hr_userToken");
+        const API_BASE_URL = "http://localhost:5000"; // Sesuaikan dengan URL backend Anda
+
+        console.log("🔑 Token dari localStorage:", token ? "ADA" : "TIDAK ADA");
+
+        if (!token) {
+          throw new Error("Token tidak ditemukan. Silakan login kembali.");
+        }
+
+        // Endpoint berdasarkan role
+        const endpoint =
+          user.role === "Karyawan"
+            ? `${API_BASE_URL}/api/payroll/my-slip` // ✅ Endpoint baru
+            : `${API_BASE_URL}/api/payroll`;
+
+        console.log("🔗 Fetching from:", endpoint);
+
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        console.log("📡 Response status:", response.status);
+
+        if (!response.ok) {
+          // Handle berbagai error response
+          if (response.status === 403) {
+            throw new Error("Anda tidak memiliki akses ke resource ini.");
+          } else if (response.status === 401) {
+            throw new Error("Sesi Anda telah habis. Silakan login kembali.");
+          }
+          throw new Error(`Error: ${response.status} - ${response.statusText}`);
+        }
+
+        const payrolls = await response.json();
+        console.log("Fetched payrolls:", payrolls);
+
+        // Filter dan sort payrolls
+        const myPayslips = payrolls
+          .filter((p) => Number(p.total_gaji) > 1000) // Filter gaji minimal
+          .sort((a, b) => b.periode.localeCompare(a.periode)); // Sort terbaru dulu
+
+        console.log("Filtered payslips:", myPayslips);
+
+        setAllPayslips(myPayslips);
+
+        if (myPayslips.length > 0) {
+          setSelectedPeriod(myPayslips[0].periode);
+          setSlipData(myPayslips[0]);
+        } else {
+          setError(
+            "Belum ada data slip gaji untuk Anda. Data payroll belum diproses oleh Admin/HR."
+          );
+          setSlipData(null);
+        }
+      } catch (e) {
+        console.error("Error fetching payslips:", e);
+        setError(e.message || "Gagal memuat data slip gaji.");
+        setAllPayslips([]);
+        setSlipData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchPayslipData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handlePeriodChange = (e) => {
@@ -170,7 +231,7 @@ export default function PaySlip() {
     const printWindow = window.open("", "", "height=600,width=800");
     printWindow.document.write("<html><head><title>Slip Gaji</title>");
     printWindow.document.write(
-      "<style>body { font-family: sans-serif; padding: 20px; color: #333; } .header { text-align: center; margin-bottom: 20px; } .detail-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding: 5px 0; } .total-row { border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; font-size: 1.2em; font-weight: bold; }</style>"
+      "<style>body { font-family: sans-serif; padding: 20px; color: #333; } .detail-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding: 5px 0; } .total-row { border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; font-size: 1.2em; font-weight: bold; }</style>"
     );
     printWindow.document.write("</head><body>");
     printWindow.document.write(content);
@@ -187,7 +248,6 @@ export default function PaySlip() {
     try {
       const element = document.getElementById("payslip-content");
 
-      // Capture element as canvas with high quality
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -197,19 +257,17 @@ export default function PaySlip() {
 
       const imgData = canvas.toDataURL("image/png");
 
-      // Create PDF
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
 
-      const imgWidth = 210; // A4 width in mm
+      const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
 
-      // Generate filename
       const filename = `Slip_Gaji_${user?.username}_${formatPeriod(
         slipData.periode
       ).replace(/\s+/g, "_")}.pdf`;
@@ -222,6 +280,39 @@ export default function PaySlip() {
       setIsGenerating(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div style={styles.mainContainer}>
+        <h1 style={styles.header}>Slip Gaji Karyawan</h1>
+        <div style={{ ...styles.card, textAlign: "center", color: "#ccc" }}>
+          Memuat data...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.mainContainer}>
+        <h1 style={styles.header}>Slip Gaji Karyawan</h1>
+        <div style={{ ...styles.card, textAlign: "center" }}>
+          <p
+            style={{
+              color: "#FF6347",
+              fontSize: "1.1rem",
+              marginBottom: "1rem",
+            }}
+          >
+            ⚠️ {error}
+          </p>
+          <p style={{ color: "#999", fontSize: "0.9rem" }}>
+            Silakan hubungi Admin/HR untuk informasi lebih lanjut.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.mainContainer}>
@@ -290,16 +381,16 @@ export default function PaySlip() {
                     color: "#333",
                   }}
                 >
-                  {user?.username}
+                  {slipData.employee?.nama_lengkap || user?.username}
                 </p>
-
                 <p style={{ color: "#666", margin: "0.3rem 0" }}>
                   Role/Jabatan:
                 </p>
                 <p style={{ margin: "0.3rem 0", color: "#333" }}>
-                  {slipData.employee_role}
+                  {slipData.employee?.jabatan ||
+                    slipData.employee_role ||
+                    user?.role}
                 </p>
-
                 <p style={{ color: "#666", margin: "0.3rem 0" }}>
                   ID Karyawan:
                 </p>
@@ -321,6 +412,7 @@ export default function PaySlip() {
             >
               Penerimaan
             </h3>
+
             <div style={styles.detailGrid}>
               <p style={{ margin: "0.3rem 0", color: "#333" }}>Gaji Pokok:</p>
               <p
@@ -333,7 +425,6 @@ export default function PaySlip() {
               >
                 {formatRupiah(slipData.gaji_pokok)}
               </p>
-
               <p style={{ margin: "0.3rem 0", color: "#333" }}>
                 Tunjangan Lain:
               </p>
@@ -361,6 +452,7 @@ export default function PaySlip() {
             >
               Potongan
             </h3>
+
             <div style={styles.detailGrid}>
               <p style={{ margin: "0.3rem 0", color: "#333" }}>
                 Total Potongan:
@@ -375,7 +467,6 @@ export default function PaySlip() {
               >
                 ({formatRupiah(slipData.potongan)})
               </p>
-
               <p
                 style={{ color: "#999", fontSize: "0.9em", margin: "0.3rem 0" }}
               >
@@ -452,10 +543,7 @@ export default function PaySlip() {
         </div>
       ) : (
         <div style={{ ...styles.card, textAlign: "center", color: "#c0c0c0" }}>
-          <p>
-            Silakan pilih periode di atas, atau data gaji untuk karyawan ini
-            belum diproses.
-          </p>
+          <p>Belum ada data slip gaji yang tersedia untuk Anda.</p>
         </div>
       )}
 

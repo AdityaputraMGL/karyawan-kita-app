@@ -8,10 +8,14 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
+  // Pastikan forgotPassword dan resetPassword diexport di AuthContext
   const { login, register, forgotPassword, resetPassword } = useAuth();
 
+  // State untuk Login
   const [username, setU] = useState("");
   const [password, setP] = useState("");
+
+  // State untuk Register
   const [rUsername, setRU] = useState("");
   const [rEmail, setRE] = useState("");
   const [rPass, setRP] = useState("");
@@ -19,6 +23,7 @@ export default function Login() {
   const [rRole, setRRole] = useState("Karyawan");
   const [rStatusKaryawan, setRStatusKaryawan] = useState("Magang");
 
+  // State untuk Forgot/Reset Password
   const [forgotEmail, setForgotEmail] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -63,6 +68,7 @@ export default function Login() {
     }
   };
 
+  // FUNGSI INI AKAN MEMANGGIL ENDPOINT BARU /forgot-password
   const onForgetPassword = async (e) => {
     e.preventDefault();
     setErr("");
@@ -71,24 +77,31 @@ export default function Login() {
     try {
       const result = await forgotPassword(forgotEmail.trim());
 
-      if (result.devToken) {
-        setSuccess("");
-        setResetToken(result.devToken);
-        setTab("reset");
-      } else {
-        setSuccess(
+      // 1. Set pesan sukses
+      setSuccess(
+        result.message ||
           "Link reset password telah dikirim ke email Anda. Silakan cek inbox/spam."
-        );
+      );
+
+      // 2. Jika ada devToken dari backend (untuk local/debugging), set tokennya
+      if (result.devToken) {
+        setResetToken(result.devToken);
       }
 
-      setForgotEmail("");
+      // 3. PAKSA PINDAH TAB ke 'reset' (sesuai permintaan user)
+      setTab("reset");
     } catch (e) {
-      setErr(e.message || "Gagal mengirim email reset password");
+      const errorMessage =
+        e.response?.data?.error ||
+        e.message ||
+        "Gagal mengirim email reset password";
+      setErr(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
+  // FUNGSI INI AKAN MEMANGGIL ENDPOINT BARU /reset-password
   const onResetPassword = async (e) => {
     e.preventDefault();
     setErr("");
@@ -108,17 +121,19 @@ export default function Login() {
 
       setTimeout(() => setTab("login"), 2000);
     } catch (e) {
-      setErr(
+      // e.response.data.error jika menggunakan axios
+      const errorMessage =
+        e.response?.data?.error ||
         e.message ||
-          "Gagal mereset password. Token mungkin tidak valid atau sudah expired."
-      );
+        "Gagal mereset password. Token mungkin tidak valid atau sudah expired.";
+      setErr(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   // ------------------------------------------------------------------
-  // INLINE STYLES
+  // INLINE STYLES (Dibiarkan sama persis dengan yang Anda berikan)
   // ------------------------------------------------------------------
   const INPUT_STYLE = {
     width: "100%",
@@ -471,7 +486,11 @@ export default function Login() {
                 <div style={{ textAlign: "center" }}>
                   <button
                     type="button"
-                    onClick={() => setTab("forget")}
+                    onClick={() => {
+                      setTab("forget");
+                      setErr(""); // Clear errors saat pindah tab
+                      setSuccess(""); // Clear success message saat pindah tab
+                    }}
                     style={styles.linkButton}
                   >
                     Lupa password?
@@ -682,7 +701,11 @@ export default function Login() {
               <div style={{ textAlign: "center", marginTop: "4px" }}>
                 <button
                   type="button"
-                  onClick={() => setTab("login")}
+                  onClick={() => {
+                    setTab("login");
+                    setErr(""); // Clear errors saat pindah tab
+                    setSuccess(""); // Clear success message saat pindah tab
+                  }}
                   style={styles.linkButton}
                 >
                   ← Kembali ke login

@@ -64,12 +64,10 @@ export default function App() {
                         {/* Data Karyawan: Admin & HR */}           {" "}
             <Route element={<RequireRole allow={["Admin", "HR"]} />}>
                            {" "}
-              <Route path="/employees" element={<EmployeeList />} />
-                           {" "}
-              <Route path="/employee/:id" element={<EmployeeDetail />} />
-                           {" "}
-              <Route path="/add-employee" element={<AddEmployee />} />         
-               {" "}
+              <Route path="/employees" element={<EmployeeList />} />           
+                <Route path="/employee/:id" element={<EmployeeDetail />} />     
+                      <Route path="/add-employee" element={<AddEmployee />} /> 
+                       {" "}
             </Route>
                         {/* Absensi: Semua boleh akses */}
                         <Route path="/attendance" element={<Attendance />} />   

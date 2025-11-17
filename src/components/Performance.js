@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import * as api from "../services/api";
+import { useCallback, useEffect, useState } from "react"; // ⭐ Tambahkan useCallback
+import * as api from "../services/api"; // Diperlukan untuk getCurrentUser()
+import { employee, performance } from "../services/api"; // ⭐ IMPORT YANG BENAR (employee & performance)
 
 // --- Inline Styles untuk Kerapian dan Konsistensi ---
 const styles = {
@@ -84,8 +85,10 @@ const getScoreColor = (nilai) => {
 // --- End Inline Styles ---
 
 export default function Performance() {
-  const [employees, setEmployees] = useState([]);
+  const [employeesData, setEmployeesData] = useState([]); // ⭐ Ganti employees -> employeesData
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true); // ⭐ LOADING STATE
+  const [error, setError] = useState(null); // ⭐ ERROR STATE
   const [form, setForm] = useState({
     employee_id: "",
     periode: "2025-Q3",
@@ -98,12 +101,31 @@ export default function Performance() {
   const isAdmin = currentUser?.role === "Admin";
   const canInput = isAdmin;
 
-  useEffect(() => {
-    setEmployees(api.employees.findAll());
-    setList(api.performance.findAll());
+  // ⭐ FUNGSI REFRESH ASYNCHRONOUS
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // ⭐ Gunakan employee.findAll() dan performance.findAll()
+      const empData = await employee.findAll();
+      const perfData = await performance.findAll();
+
+      setEmployeesData(empData);
+      setList(perfData);
+    } catch (e) {
+      setError(e.message || "Gagal memuat data kinerja.");
+      console.error("Gagal memuat data kinerja:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const submit = (e) => {
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const submit = async (e) => {
+    // ⭐ Jadikan async
     e.preventDefault();
 
     if (!canInput) {
@@ -118,15 +140,58 @@ export default function Performance() {
       return;
     }
 
-    api.performance.create(form);
-    setList(api.performance.findAll());
-    setForm({
-      employee_id: "",
-      periode: "2025-Q3",
-      nilai_kinerja: 0,
-      catatan: "",
-    });
+    try {
+      await performance.create(form); // ⭐ Gunakan performance.create()
+      alert("Data kinerja berhasil disimpan!");
+      refresh();
+      setForm({
+        employee_id: "",
+        periode: "2025-Q3",
+        nilai_kinerja: 0,
+        catatan: "",
+      });
+    } catch (e) {
+      setError(e.message || "Gagal menyimpan data kinerja.");
+      alert("Gagal menyimpan data kinerja: " + e.message);
+    }
   };
+
+  // Tampilkan Loading/Error
+  if (loading) {
+    return (
+      <div style={styles.mainContainer}>
+        <h1 style={styles.title}>Manajemen Talenta</h1>
+        <div
+          style={{
+            ...styles.card,
+            padding: "20px",
+            textAlign: "center",
+            color: "#ccc",
+          }}
+        >
+          Memuat data...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.mainContainer}>
+        <h1 style={styles.title}>Manajemen Talenta</h1>
+        <div
+          style={{
+            ...styles.card,
+            padding: "20px",
+            textAlign: "center",
+            color: "#FF6347",
+          }}
+        >
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.mainContainer}>
@@ -147,11 +212,15 @@ export default function Performance() {
               required
             >
               <option value="">- pilih -</option>
-              {employees.map((e) => (
-                <option key={e.employee_id} value={e.employee_id}>
-                  {e.nama_lengkap}
-                </option>
-              ))}
+              {employeesData.map(
+                (
+                  e // ⭐ Ganti employees -> employeesData
+                ) => (
+                  <option key={e.employee_id} value={e.employee_id}>
+                    {e.nama_lengkap}
+                  </option>
+                )
+              )}
             </select>
           </div>
           <div style={styles.formElement}>
@@ -226,8 +295,10 @@ export default function Performance() {
           </thead>
           <tbody>
             {list.map((p) => {
-              // ✅ PERBAIKAN: Memastikan pemanggilan findById dilakukan
-              const emp = api.employees.findById(p.employee_id);
+              // ⭐ Gunakan employeesData
+              const emp = employeesData.find(
+                (ed) => ed.employee_id === p.employee_id
+              );
 
               // Tentukan nama dan role dengan fallback
               const employeeName = emp?.nama_lengkap || p.employee_id;

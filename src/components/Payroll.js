@@ -1,22 +1,16 @@
-import { useEffect, useState } from "react";
-import * as api from "../services/api";
+import { useCallback, useEffect, useState } from "react";
+import { attendance, employee, leave, payroll } from "../services/api";
 
-// --- Inline Styles untuk Kerapian dan Konsistensi ---
+// --- Inline Styles ---
 const styles = {
-  mainContainer: {
-    padding: "2rem 1.5rem 1.5rem 1.5rem",
-  },
+  mainContainer: { padding: "2rem 1.5rem 1.5rem 1.5rem" },
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "1.5rem",
   },
-  title: {
-    fontSize: "2.2rem",
-    fontWeight: "700",
-    color: "#fff",
-  },
+  title: { fontSize: "2.2rem", fontWeight: "700", color: "#fff" },
   btn: {
     padding: "0.6rem 1rem",
     borderRadius: "8px",
@@ -39,11 +33,7 @@ const styles = {
     gridTemplateColumns: "repeat(3, 1fr)",
     gap: "1.5rem 2rem",
   },
-  formElement: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.4rem",
-  },
+  formElement: { display: "flex", flexDirection: "column", gap: "0.4rem" },
   label: {
     fontSize: "0.9rem",
     fontWeight: "500",
@@ -58,11 +48,7 @@ const styles = {
     fontSize: "0.9rem",
     appearance: "none",
   },
-  inputReadOnly: {
-    background: "#3A4068",
-    fontWeight: "bold",
-    color: "#fff",
-  },
+  inputReadOnly: { background: "#3A4068", fontWeight: "bold", color: "#fff" },
   btnSimpan: {
     backgroundColor: "#5C54A4",
     color: "#fff",
@@ -81,15 +67,8 @@ const styles = {
     marginBottom: "1.5rem",
     color: "rgba(255, 255, 255, 0.8)",
   },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    color: "white",
-  },
-  tableHeader: {
-    backgroundColor: "#3A4068",
-    textAlign: "left",
-  },
+  table: { width: "100%", borderCollapse: "collapse", color: "white" },
+  tableHeader: { backgroundColor: "#3A4068", textAlign: "left" },
   th: {
     padding: "0.8rem 1.5rem",
     fontSize: "0.9rem",
@@ -121,7 +100,7 @@ const styles = {
   btnDelete: {
     background: "none",
     border: "none",
-    color: "#FF6347", // Merah terang
+    color: "#FF6347",
     cursor: "pointer",
     fontSize: "1rem",
     padding: "0.4rem",
@@ -135,23 +114,11 @@ const POTONGAN_TERLAMBAT = 25000;
 const POTONGAN_IZIN = 50000;
 const POTONGAN_SAKIT = 0;
 
-// Fungsi untuk membersihkan data payroll
-const cleanPayrollData = (payrollList) => {
-  if (api.payroll.cleanData) {
-    const cleanedList = api.payroll.cleanData(payrollList);
-    console.log(
-      `Pembersihan Data: ${
-        payrollList.length - cleanedList.length
-      } entri dihapus.`
-    );
-    return cleanedList;
-  }
-  return payrollList;
-};
-
 export default function Payroll() {
-  const [employees, setEmployees] = useState([]);
+  const [employeesData, setEmployeesData] = useState([]);
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [deductionDetails, setDeductionDetails] = useState({
     alpa: 0,
     terlambat: 0,
@@ -163,7 +130,7 @@ export default function Payroll() {
 
   const [form, setForm] = useState({
     employee_id: "",
-    periode: new Date().toISOString().slice(0, 7), // Default bulan ini
+    periode: new Date().toISOString().slice(0, 7),
     gaji_pokok: 0,
     tunjangan: 0,
     potongan: 0,
@@ -179,249 +146,248 @@ export default function Payroll() {
     }).format(number);
   };
 
-  // Fungsi untuk me-refresh data daftar payroll
-  const refreshList = () => {
-    const rawPayrollData = api.payroll.findAll();
-    const cleanData = cleanPayrollData(rawPayrollData);
-    setList(cleanData);
-  };
+  // Refresh List
+  const refreshList = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const employeeData = await employee.findAll();
+      const rawPayrollData = await payroll.findAll();
 
-  // Fungsi baru: Hapus data payroll
-  const deletePayroll = (payrollId) => {
+      setEmployeesData(employeeData);
+      setList(rawPayrollData);
+    } catch (e) {
+      setError(e.message || "Gagal memuat data utama.");
+      console.error("Error loading payroll data:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Delete Payroll
+  const deletePayroll = async (payrollId) => {
     if (
       window.confirm(
         "Apakah Anda yakin ingin menghapus data payroll ini? Aksi ini tidak bisa dibatalkan."
       )
     ) {
-      api.payroll.delete(payrollId);
-      refreshList();
-      alert("✅ Data payroll berhasil dihapus.");
-    }
-  };
-
-  // ⭐ FUNGSI UTAMA: Hitung Potongan Otomatis Real-time
-  const calculateAutoDeduction = (employeeId, periode) => {
-    console.log("=== REAL-TIME DEDUCTION CALCULATION ===");
-    console.log("Employee ID:", employeeId);
-    console.log("Periode:", periode);
-
-    if (!employeeId || !periode) {
-      setDeductionDetails({
-        alpa: 0,
-        terlambat: 0,
-        izin: 0,
-        sakit: 0,
-        totalPotongan: 0,
-        breakdown: [],
-      });
-      setForm((prev) => ({ ...prev, potongan: 0, alasan_potongan: "" }));
-      return;
-    }
-
-    // Normalisasi employeeId untuk perbandingan yang aman
-    const normalizedEmployeeId = String(employeeId).toLowerCase().trim();
-
-    // Memastikan pemuatan data terbaru
-    const allAttendance = api.attendance.findAll();
-    const allLeaves = api.leave ? api.leave.findAll() : [];
-
-    console.log(`TOTAL ATTENDANCE RECORDS FOUND: ${allAttendance.length}`);
-    console.log(`TOTAL LEAVE RECORDS FOUND: ${allLeaves.length}`);
-
-    const [year, month] = periode.split("-");
-
-    // 1️⃣ Filter Absensi
-    const employeeAttendance = allAttendance.filter((a) => {
-      const attendanceEmployeeId = String(a.employee_id).toLowerCase().trim();
-      if (attendanceEmployeeId !== normalizedEmployeeId) return false;
-
-      const attendanceDate = new Date(a.tanggal);
-      const attendanceYear = attendanceDate.getFullYear().toString();
-      const attendanceMonth = String(attendanceDate.getMonth() + 1).padStart(
-        2,
-        "0"
-      );
-
-      return attendanceYear === year && attendanceMonth === month;
-    });
-
-    // 2️⃣ Hitung ALPA
-    const alpaCount = employeeAttendance.filter(
-      (a) => a.status === "alpa"
-    ).length;
-    const potonganAlpa = alpaCount * POTONGAN_ALPA;
-
-    // 3️⃣ Hitung TERLAMBAT (jam masuk > 08:00)
-    const lateRecords = employeeAttendance.filter((a) => {
-      if (!a.jam_masuk || a.status !== "hadir") return false;
-
-      const timeParts = a.jam_masuk.split(":");
-      const hour = Number(timeParts[0]);
-      const minute = Number(timeParts[1]);
-
-      const isLate = hour > 8 || (hour === 8 && minute > 0);
-      return isLate;
-    });
-
-    const lateCount = lateRecords.length;
-    const potonganTerlambat = lateCount * POTONGAN_TERLAMBAT;
-
-    // 4️⃣ & 5️⃣ Hitung Izin & Sakit dari absensi
-    let izinCount = employeeAttendance.filter(
-      (a) => a.status === "izin"
-    ).length;
-    let sakitCount = employeeAttendance.filter(
-      (a) => a.status === "sakit"
-    ).length;
-
-    // 6️⃣ Tambahkan data dari Leave/Cuti yang approved
-    const employeeLeaves = allLeaves.filter((leave) => {
-      if (!leave.employee_id) return false;
-      const leaveEmployeeId = String(leave.employee_id).toLowerCase().trim();
-      if (leaveEmployeeId !== normalizedEmployeeId) return false;
-      if (leave.status !== "approved") return false;
-
-      const dateField =
-        leave.tanggal_mulai || leave.tanggal_pengajuan || leave.start_date;
-      if (!dateField) return false;
-
-      // ⭐ PERBAIKAN KRITIS: Memastikan Tanggal di-parse sebagai UTC untuk Filter Bulan yang Akurat
-      // Menggunakan format ISO dan getUTCFullYear/getUTCMonth
-      const isoDateField = dateField + "T00:00:00.000Z";
-      const startDate = new Date(isoDateField);
-
-      const startYear = startDate.getUTCFullYear().toString();
-      const startMonth = String(startDate.getUTCMonth() + 1).padStart(2, "0");
-
-      return startYear === year && startMonth === month;
-    });
-
-    // Hitung durasi cuti
-    employeeLeaves.forEach((leave) => {
-      // ⭐ PERBAIKAN KRITIS: Perhitungan Durasi Hari yang Tepat
-      // Pastikan parsing tanggal selalu menggunakan ISO/UTC untuk menghindari masalah zona waktu
-      const startDate = new Date(leave.tanggal_mulai + "T00:00:00.000Z");
-      const endDate = new Date(leave.tanggal_selesai + "T00:00:00.000Z");
-
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-      const oneDay = 1000 * 60 * 60 * 24;
-
-      // Hitung selisih hari dan bulatkan ke atas, lalu tambah 1 (untuk menghitung hari terakhir)
-      const diffDays = Math.round(diffTime / oneDay) + 1;
-
-      console.log(
-        `✅ Leave Duration Calculated: ${diffDays} days for ID: ${leave.leave_id}`
-      );
-
-      const jenisField =
-        leave.jenis_pengajuan || leave.jenis_cuti || leave.jenis || "";
-      const jenisLower = String(jenisField).toLowerCase();
-
-      if (jenisLower.includes("izin") || jenisLower.includes("cuti")) {
-        izinCount += diffDays;
-      } else if (jenisLower.includes("sakit")) {
-        sakitCount += diffDays;
-      } else {
-        izinCount += diffDays;
+      try {
+        await payroll.delete(payrollId);
+        refreshList();
+        alert("✅ Data payroll berhasil dihapus.");
+      } catch (e) {
+        setError(e.message);
+        alert("Gagal menghapus payroll: " + e.message);
       }
-    });
-
-    // 7️⃣ Hitung Total Potongan
-    const potonganIzin = izinCount * POTONGAN_IZIN;
-    const potonganSakit = sakitCount * POTONGAN_SAKIT;
-
-    const totalPotongan =
-      potonganAlpa + potonganTerlambat + potonganIzin + potonganSakit;
-
-    // 8️⃣ & 9️⃣ Buat Breakdown & Alasan
-    const breakdown = [];
-    const reasons = [];
-
-    if (alpaCount > 0) {
-      breakdown.push({
-        type: "Alpa",
-        count: alpaCount,
-        amount: potonganAlpa,
-        icon: "❌",
-      });
-      reasons.push(`${alpaCount}x Alpa (${formatRupiah(potonganAlpa)})`);
     }
-    if (lateCount > 0) {
-      breakdown.push({
-        type: "Terlambat",
-        count: lateCount,
-        amount: potonganTerlambat,
-        icon: "⏰",
-      });
-      reasons.push(
-        `${lateCount}x Terlambat (${formatRupiah(potonganTerlambat)})`
-      );
-    }
-    if (izinCount > 0) {
-      breakdown.push({
-        type: "Izin/Cuti",
-        count: izinCount,
-        amount: potonganIzin,
-        icon: "📝",
-      });
-      reasons.push(`${izinCount}x Izin/Cuti (${formatRupiah(potonganIzin)})`);
-    }
-    if (sakitCount > 0) {
-      breakdown.push({
-        type: "Sakit",
-        count: sakitCount,
-        amount: potonganSakit,
-        icon: "🏥",
-      });
-      reasons.push(`${sakitCount}x Sakit (Tidak ada potongan)`);
-    }
-
-    const alasanPotongan =
-      reasons.length > 0 ? reasons.join(" | ") : "Tidak ada potongan";
-
-    // 🔟 Update State
-    const details = {
-      alpa: alpaCount,
-      terlambat: lateCount,
-      izin: izinCount,
-      sakit: sakitCount,
-      totalPotongan: totalPotongan,
-      breakdown: breakdown,
-    };
-
-    console.log(
-      `✅ FINAL DEDUCTION COUNT: ${lateCount}x Terlambat, ${izinCount}x Izin/Cuti. Total Potongan: ${totalPotongan}`
-    );
-
-    setDeductionDetails(details);
-    setForm((prev) => ({
-      ...prev,
-      potongan: totalPotongan,
-      alasan_potongan: alasanPotongan,
-    }));
   };
+
+  // Calculate Auto Deduction
+  const calculateAutoDeduction = useCallback(
+    async (employeeId, periode) => {
+      if (!employeeId || !periode) {
+        setDeductionDetails({
+          alpa: 0,
+          terlambat: 0,
+          izin: 0,
+          sakit: 0,
+          totalPotongan: 0,
+          breakdown: [],
+        });
+        setForm((prev) => ({ ...prev, potongan: 0, alasan_potongan: "" }));
+        return;
+      }
+
+      try {
+        const allAttendance = await attendance.findAll();
+        const allLeaves = await leave.findAll();
+
+        const normalizedEmployeeId = String(employeeId).toLowerCase().trim();
+        const [year, month] = periode.split("-");
+
+        // Filter Absensi
+        const employeeAttendance = allAttendance.filter((a) => {
+          const attendanceEmployeeId = String(a.employee_id)
+            .toLowerCase()
+            .trim();
+          if (attendanceEmployeeId !== normalizedEmployeeId) return false;
+
+          const attendanceDate = new Date(a.tanggal);
+          const attendanceYear = attendanceDate.getFullYear().toString();
+          const attendanceMonth = String(
+            attendanceDate.getMonth() + 1
+          ).padStart(2, "0");
+
+          return attendanceYear === year && attendanceMonth === month;
+        });
+
+        // Hitung ALPA
+        const alpaCount = employeeAttendance.filter(
+          (a) => a.status === "alpa"
+        ).length;
+        const potonganAlpa = alpaCount * POTONGAN_ALPA;
+
+        // Hitung TERLAMBAT
+        const lateRecords = employeeAttendance.filter((a) => {
+          if (!a.jam_masuk || a.status !== "hadir") return false;
+          const timeParts = a.jam_masuk.split(":");
+          const hour = Number(timeParts[0]);
+          const minute = Number(timeParts[1]);
+          return hour > 8 || (hour === 8 && minute > 0);
+        });
+        const lateCount = lateRecords.length;
+        const potonganTerlambat = lateCount * POTONGAN_TERLAMBAT;
+
+        // Hitung Izin & Sakit dari absensi
+        let izinCount = employeeAttendance.filter(
+          (a) => a.status === "izin"
+        ).length;
+        let sakitCount = employeeAttendance.filter(
+          (a) => a.status === "sakit"
+        ).length;
+
+        // Tambahkan dari Leave/Cuti yang approved
+        const employeeLeaves = allLeaves.filter((l) => {
+          if (!l.employee_id) return false;
+          const leaveEmployeeId = String(l.employee_id).toLowerCase().trim();
+          if (leaveEmployeeId !== normalizedEmployeeId) return false;
+          if (l.status !== "approved") return false;
+
+          const dateField =
+            l.tanggal_mulai || l.tanggal_pengajuan || l.start_date;
+          if (!dateField) return false;
+
+          const isoDateField = dateField + "T00:00:00.000Z";
+          const startDate = new Date(isoDateField);
+
+          const startYear = startDate.getUTCFullYear().toString();
+          const startMonth = String(startDate.getUTCMonth() + 1).padStart(
+            2,
+            "0"
+          );
+
+          return startYear === year && startMonth === month;
+        });
+
+        // Hitung durasi cuti
+        employeeLeaves.forEach((lv) => {
+          const startDate = new Date(lv.tanggal_mulai + "T00:00:00.000Z");
+          const endDate = new Date(lv.tanggal_selesai + "T00:00:00.000Z");
+
+          const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+          const oneDay = 1000 * 60 * 60 * 24;
+          const diffDays = Math.round(diffTime / oneDay) + 1;
+
+          const jenisField =
+            lv.jenis_pengajuan || lv.jenis_cuti || lv.jenis || "";
+          const jenisLower = String(jenisField).toLowerCase();
+
+          if (jenisLower.includes("izin") || jenisLower.includes("cuti")) {
+            izinCount += diffDays;
+          } else if (jenisLower.includes("sakit")) {
+            sakitCount += diffDays;
+          } else {
+            izinCount += diffDays;
+          }
+        });
+
+        // Hitung Total Potongan
+        const potonganIzin = izinCount * POTONGAN_IZIN;
+        const potonganSakit = sakitCount * POTONGAN_SAKIT;
+
+        const totalPotongan =
+          potonganAlpa + potonganTerlambat + potonganIzin + potonganSakit;
+
+        // Buat Breakdown & Alasan
+        const breakdown = [];
+        const reasons = [];
+
+        if (alpaCount > 0) {
+          breakdown.push({
+            type: "Alpa",
+            count: alpaCount,
+            amount: potonganAlpa,
+            icon: "❌",
+          });
+          reasons.push(`${alpaCount}x Alpa (${formatRupiah(potonganAlpa)})`);
+        }
+        if (lateCount > 0) {
+          breakdown.push({
+            type: "Terlambat",
+            count: lateCount,
+            amount: potonganTerlambat,
+            icon: "⏰",
+          });
+          reasons.push(
+            `${lateCount}x Terlambat (${formatRupiah(potonganTerlambat)})`
+          );
+        }
+        if (izinCount > 0) {
+          breakdown.push({
+            type: "Izin/Cuti",
+            count: izinCount,
+            amount: potonganIzin,
+            icon: "📝",
+          });
+          reasons.push(
+            `${izinCount}x Izin/Cuti (${formatRupiah(potonganIzin)})`
+          );
+        }
+        if (sakitCount > 0) {
+          breakdown.push({
+            type: "Sakit",
+            count: sakitCount,
+            amount: potonganSakit,
+            icon: "🏥",
+          });
+          reasons.push(`${sakitCount}x Sakit (Tidak ada potongan)`);
+        }
+
+        const alasanPotongan =
+          reasons.length > 0 ? reasons.join(" | ") : "Tidak ada potongan";
+
+        // Update State
+        const details = {
+          alpa: alpaCount,
+          terlambat: lateCount,
+          izin: izinCount,
+          sakit: sakitCount,
+          totalPotongan: totalPotongan,
+          breakdown: breakdown,
+        };
+
+        setDeductionDetails(details);
+        setForm((prev) => ({
+          ...prev,
+          potongan: totalPotongan,
+          alasan_potongan: alasanPotongan,
+        }));
+      } catch (e) {
+        setError("Gagal menghitung potongan: " + e.message);
+        console.error("Deduction calc error:", e);
+      }
+    },
+    [formatRupiah]
+  );
 
   // Load Data Awal
   useEffect(() => {
-    // Memastikan pemuatan data awal dilakukan dengan memanggil semua API findAll()
-    const employeeData = api.employees.findAll();
-    setEmployees(employeeData);
     refreshList();
-  }, []);
+  }, [refreshList]);
 
   // Handler ketika karyawan atau periode berubah
   const handleEmployeeOrPeriodChange = (field, value) => {
     let employeeIdToCalculate = form.employee_id;
     let periodeToCalculate = form.periode;
 
-    // Update form state
     const updatedForm = { ...form, [field]: value };
 
     if (field === "employee_id") {
       employeeIdToCalculate = value;
-      const selectedEmployee = employees.find((e) => e.employee_id === value);
+      const selectedEmployee = employeesData.find(
+        (e) => e.employee_id === value
+      );
 
-      // Reset gaji/potongan saat karyawan baru dipilih
       updatedForm.gaji_pokok = selectedEmployee?.gaji_pokok || 5000000;
       updatedForm.tunjangan = 0;
       updatedForm.potongan = 0;
@@ -441,11 +407,8 @@ export default function Payroll() {
 
     setForm(updatedForm);
 
-    // ⭐ REAL-TIME: Hitung potongan otomatis menggunakan ID/Periode terbaru
     if (employeeIdToCalculate && periodeToCalculate) {
-      setTimeout(() => {
-        calculateAutoDeduction(employeeIdToCalculate, periodeToCalculate);
-      }, 100);
+      calculateAutoDeduction(employeeIdToCalculate, periodeToCalculate);
     }
   };
 
@@ -454,7 +417,7 @@ export default function Payroll() {
     (Number(form.tunjangan) || 0) -
     (Number(form.potongan) || 0);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
 
     if (!form.employee_id) {
@@ -466,41 +429,43 @@ export default function Payroll() {
       return;
     }
 
-    const employeeData = employees.find(
-      (e) => e.employee_id === form.employee_id
-    );
-    const employeeRole =
-      employeeData?.jabatan || employeeData?.role || "Karyawan";
+    try {
+      const employeeData = employeesData.find(
+        (e) => e.employee_id === form.employee_id
+      );
+      const employeeRole =
+        employeeData?.jabatan || employeeData?.role || "Karyawan";
 
-    api.payroll.create({
-      ...form,
-      employee_role: employeeRole,
-      total_gaji: calcTotal(),
-      alasan_potongan: form.alasan_potongan || "Tidak ada potongan",
-    });
+      await payroll.create({
+        ...form,
+        employee_role: employeeRole,
+        total_gaji: calcTotal(),
+        alasan_potongan: form.alasan_potongan || "Tidak ada potongan",
+      });
 
-    refreshList();
+      refreshList();
 
-    // Reset form
-    setForm({
-      employee_id: "",
-      periode: new Date().toISOString().slice(0, 7),
-      gaji_pokok: 0,
-      tunjangan: 0,
-      potongan: 0,
-      alasan_potongan: "",
-    });
-
-    setDeductionDetails({
-      alpa: 0,
-      terlambat: 0,
-      izin: 0,
-      sakit: 0,
-      totalPotongan: 0,
-      breakdown: [],
-    });
-
-    alert("✅ Data payroll berhasil disimpan!");
+      setForm({
+        employee_id: "",
+        periode: new Date().toISOString().slice(0, 7),
+        gaji_pokok: 0,
+        tunjangan: 0,
+        potongan: 0,
+        alasan_potongan: "",
+      });
+      setDeductionDetails({
+        alpa: 0,
+        terlambat: 0,
+        izin: 0,
+        sakit: 0,
+        totalPotongan: 0,
+        breakdown: [],
+      });
+      alert("✅ Data payroll berhasil disimpan!");
+    } catch (e) {
+      setError(e.message);
+      alert("Gagal menyimpan payroll: " + e.message);
+    }
   };
 
   const exportCSV = () => {
@@ -514,6 +479,7 @@ export default function Payroll() {
       alasan_potongan: p.alasan_potongan || "",
       total_gaji: p.total_gaji,
     }));
+
     const header = Object.keys(rows[0] || {}).join(",");
     const body = rows
       .map((r) =>
@@ -528,6 +494,9 @@ export default function Payroll() {
     a.download = "payroll.csv";
     a.click();
   };
+
+  if (loading) return <div style={styles.mainContainer}>Memuat data...</div>;
+  if (error) return <div style={styles.mainContainer}>Error: {error}</div>;
 
   return (
     <div style={styles.mainContainer}>
@@ -572,10 +541,9 @@ export default function Payroll() {
               handleEmployeeOrPeriodChange("employee_id", e.target.value)
             }
             required
-            key={`employee-select-${form.employee_id}`}
           >
             <option value="">- Pilih Karyawan -</option>
-            {employees.map((e) => (
+            {employeesData.map((e) => (
               <option key={e.employee_id} value={e.employee_id}>
                 {e.nama_lengkap}
               </option>
@@ -587,8 +555,8 @@ export default function Payroll() {
         <div style={styles.formElement}>
           <label style={styles.label}>Periode *</label>
           <input
-            style={styles.inputField}
             type="month"
+            style={styles.inputField}
             value={form.periode}
             onChange={(e) =>
               handleEmployeeOrPeriodChange("periode", e.target.value)
@@ -599,169 +567,132 @@ export default function Payroll() {
 
         {/* Gaji Pokok */}
         <div style={styles.formElement}>
-          <label style={styles.label}>Gaji Pokok *</label>
+          <label style={styles.label}>Gaji Pokok (Rp) *</label>
           <input
-            style={styles.inputField}
             type="number"
+            style={styles.inputField}
             value={form.gaji_pokok}
             onChange={(e) => setForm({ ...form, gaji_pokok: e.target.value })}
             required
+            min="0"
           />
         </div>
 
         {/* Tunjangan */}
         <div style={styles.formElement}>
-          <label style={styles.label}>Tunjangan</label>
+          <label style={styles.label}>Tunjangan (Rp)</label>
           <input
-            style={styles.inputField}
             type="number"
+            style={styles.inputField}
             value={form.tunjangan}
             onChange={(e) => setForm({ ...form, tunjangan: e.target.value })}
+            min="0"
           />
         </div>
 
-        {/* Potongan Otomatis */}
+        {/* Potongan (Auto) */}
         <div style={styles.formElement}>
-          <label style={styles.label}>⚡ Potongan (Auto)</label>
+          <label style={styles.label}>Potongan (Auto) 🤖</label>
           <input
-            style={{
-              ...styles.inputField,
-              ...styles.inputReadOnly,
-              color: form.potongan > 0 ? "#f44336" : "#4CAF50",
-              fontWeight: "bold",
-            }}
+            type="number"
+            style={{ ...styles.inputField, ...styles.inputReadOnly }}
+            value={form.potongan}
+            readOnly
+          />
+        </div>
+
+        {/* Total Gaji */}
+        <div style={styles.formElement}>
+          <label style={styles.label}>Total Gaji Bersih (Rp)</label>
+          <input
             type="text"
-            value={formatRupiah(form.potongan)}
-            readOnly
-          />
-        </div>
-
-        {/* Total Gaji Bersih */}
-        <div style={styles.formElement}>
-          <label style={styles.label}>💰 Gaji Bersih</label>
-          <input
-            style={{
-              ...styles.inputField,
-              ...styles.inputReadOnly,
-              color: "#4CAF50",
-              fontWeight: "bold",
-              fontSize: "1.1rem",
-            }}
-            readOnly
+            style={{ ...styles.inputField, ...styles.inputReadOnly }}
             value={formatRupiah(calcTotal())}
+            readOnly
           />
         </div>
 
         {/* Detail Potongan Real-time */}
-        {form.employee_id && deductionDetails.breakdown.length > 0 && (
-          <div style={{ gridColumn: "1 / -1" }}>
-            <div style={styles.deductionCard}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  marginBottom: "1rem",
-                }}
-              >
-                <span style={{ fontSize: "1.3rem" }}>📊</span>
-                <strong style={{ fontSize: "1.1rem", color: "#FF6347" }}>
-                  Detail Potongan Real-time
-                </strong>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: "1rem",
-                }}
-              >
-                {deductionDetails.breakdown.map((item, idx) => (
+        {deductionDetails.breakdown.length > 0 && (
+          <div style={{ gridColumn: "1 / -1", ...styles.deductionCard }}>
+            <h4 style={{ margin: "0 0 1rem 0", color: "#FF6347" }}>
+              📋 Detail Potongan Otomatis
+            </h4>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "1rem",
+              }}
+            >
+              {deductionDetails.breakdown.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.1)",
+                    padding: "1rem",
+                    borderRadius: "8px",
+                  }}
+                >
                   <div
-                    key={idx}
                     style={{
-                      background: "rgba(0, 0, 0, 0.3)",
-                      padding: "1rem",
-                      borderRadius: "8px",
-                      borderLeft: "4px solid #FF6347",
+                      fontSize: "2rem",
+                      marginBottom: "0.5rem",
+                      textAlign: "center",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "0.5rem",
-                      }}
-                    >
-                      <span style={{ fontSize: "1.5rem" }}>{item.icon}</span>
-                      <strong style={{ color: "#fff" }}>{item.type}</strong>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.9rem",
-                        color: "rgba(255, 255, 255, 0.7)",
-                      }}
-                    >
-                      {item.count} kali
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "1.1rem",
-                        fontWeight: "bold",
-                        color: "#FF6347",
-                        marginTop: "0.3rem",
-                      }}
-                    >
-                      {item.amount > 0
-                        ? formatRupiah(item.amount)
-                        : "Tidak ada potongan"}
-                    </div>
+                    {item.icon}
                   </div>
-                ))}
-              </div>
-
-              <div
-                style={{
-                  marginTop: "1rem",
-                  paddingTop: "1rem",
-                  borderTop: "2px solid #FF6347",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <strong style={{ fontSize: "1.2rem" }}>Total Potongan:</strong>
-                <strong style={{ fontSize: "1.4rem", color: "#FF6347" }}>
-                  {formatRupiah(deductionDetails.totalPotongan)}
-                </strong>
-              </div>
+                  <div
+                    style={{
+                      fontSize: "0.9rem",
+                      color: "rgba(255, 255, 255, 0.8)",
+                      marginBottom: "0.3rem",
+                    }}
+                  >
+                    {item.type}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "1.1rem",
+                      fontWeight: "bold",
+                      color: "#fff",
+                    }}
+                  >
+                    {item.count}x = {formatRupiah(item.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: "1rem",
+                paddingTop: "1rem",
+                borderTop: "2px solid rgba(255, 255, 255, 0.2)",
+                fontSize: "1.2rem",
+                fontWeight: "bold",
+                textAlign: "right",
+              }}
+            >
+              Total Potongan: {formatRupiah(deductionDetails.totalPotongan)}
             </div>
           </div>
         )}
 
         {/* Alasan Potongan (Auto) */}
-        {form.alasan_potongan && (
-          <div style={{ gridColumn: "1 / -1" }}>
-            <div style={styles.formElement}>
-              <label style={styles.label}>
-                📝 Alasan Potongan (Auto-generated)
-              </label>
-              <textarea
-                style={{
-                  ...styles.inputField,
-                  minHeight: "60px",
-                  resize: "vertical",
-                  fontFamily: "monospace",
-                  fontSize: "0.85rem",
-                }}
-                value={form.alasan_potongan}
-                readOnly
-              />
-            </div>
-          </div>
-        )}
+        <div style={{ gridColumn: "1 / -1", ...styles.formElement }}>
+          <label style={styles.label}>Alasan Potongan (Otomatis) 📝</label>
+          <textarea
+            style={{
+              ...styles.inputField,
+              minHeight: "80px",
+              resize: "vertical",
+            }}
+            value={form.alasan_potongan}
+            readOnly
+            placeholder="Alasan potongan akan terisi otomatis..."
+          />
+        </div>
 
         {/* Tombol Simpan */}
         <div style={{ gridColumn: "1 / -1", display: "flex", gap: "1rem" }}>
@@ -773,35 +704,15 @@ export default function Payroll() {
 
       {/* Info Box Tarif */}
       <div style={styles.infoBox}>
-        <strong
-          style={{ color: "#4CAF50", display: "block", marginBottom: "0.8rem" }}
-        >
-          ℹ️ Tarif Potongan Gaji:
-        </strong>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: "0.5rem",
-            fontSize: "0.9rem",
-          }}
-        >
-          <div>
-            ❌ <strong>Alpa:</strong> {formatRupiah(POTONGAN_ALPA)} per hari
-          </div>
-          <div>
-            ⏰ <strong>Terlambat (08:00):</strong>{" "}
-            {formatRupiah(POTONGAN_TERLAMBAT)} per kali
-          </div>
-          <div>
-            📝 <strong>Izin/Cuti:</strong> {formatRupiah(POTONGAN_IZIN)} per
-            hari
-          </div>
-          <div>
-            🏥 <strong>Sakit:</strong> {formatRupiah(POTONGAN_SAKIT)} (gratis
-            dengan surat)
-          </div>
-        </div>
+        <h4 style={{ marginTop: 0, color: "#fff" }}>
+          📌 Informasi Tarif Potongan
+        </h4>
+        <ul style={{ margin: 0, paddingLeft: "1.2rem" }}>
+          <li>Alpa: {formatRupiah(POTONGAN_ALPA)} per hari</li>
+          <li>Terlambat: {formatRupiah(POTONGAN_TERLAMBAT)} per kejadian</li>
+          <li>Izin/Cuti: {formatRupiah(POTONGAN_IZIN)} per hari</li>
+          <li>Sakit: Tidak ada potongan</li>
+        </ul>
       </div>
 
       {/* Tabel Riwayat Payroll */}
@@ -817,13 +728,12 @@ export default function Payroll() {
               <th style={styles.th}>Potongan</th>
               <th style={styles.th}>Alasan</th>
               <th style={styles.th}>Gaji Bersih</th>
-              {/* Tambah kolom Aksi */}
               <th style={styles.th}>Aksi</th>
             </tr>
           </thead>
           <tbody>
             {list.map((p) => {
-              const emp = employees.find(
+              const emp = employeesData.find(
                 (e) => e.employee_id === p.employee_id
               );
               const displayRole =
@@ -865,13 +775,22 @@ export default function Payroll() {
                       {formatRupiah(p.total_gaji)}
                     </strong>
                   </td>
+                  <td style={styles.td}>
+                    <button
+                      style={styles.btnDelete}
+                      onClick={() => deletePayroll(p.payroll_id)}
+                      title="Hapus data payroll"
+                    >
+                      🗑️ Hapus
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {list.length === 0 && (
               <tr>
                 <td
-                  colSpan="9" // Kolom span bertambah menjadi 9
+                  colSpan="9"
                   style={{
                     ...styles.td,
                     textAlign: "center",
@@ -880,7 +799,7 @@ export default function Payroll() {
                   }}
                 >
                   <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>
-                    📭
+                    🔭
                   </div>
                   <em>Belum ada data payroll</em>
                 </td>
