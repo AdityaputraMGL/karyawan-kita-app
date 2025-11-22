@@ -26,6 +26,11 @@ const styles = {
     marginBottom: "1.5rem",
     maxWidth: "300px",
   },
+  formRow: {
+    display: "flex",
+    gap: "1rem",
+    marginBottom: "1.5rem",
+  },
   label: {
     fontSize: "0.9rem",
     fontWeight: "500",
@@ -107,11 +112,15 @@ const styles = {
 export default function PaySlip() {
   const { user } = useAuth();
   const [allPayslips, setAllPayslips] = useState([]);
+  const [filteredPayslips, setFilteredPayslips] = useState([]); // ⭐ TAMBAHAN: untuk filter hasil
   const [selectedPeriod, setSelectedPeriod] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState(null); // ⭐ TAMBAHAN: untuk Admin
   const [slipData, setSlipData] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const isAdmin = user?.role === "Admin"; // ⭐ TAMBAHAN: cek apakah Admin
 
   const formatRupiah = (number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -145,9 +154,8 @@ export default function PaySlip() {
       try {
         console.log("Current user:", user);
 
-        // ✅ UBAH: Gunakan endpoint khusus untuk karyawan
         const token = localStorage.getItem("hr_userToken");
-        const API_BASE_URL = "http://localhost:5000"; // Sesuaikan dengan URL backend Anda
+        const API_BASE_URL = "http://localhost:5000";
 
         console.log("🔑 Token dari localStorage:", token ? "ADA" : "TIDAK ADA");
 
@@ -155,11 +163,11 @@ export default function PaySlip() {
           throw new Error("Token tidak ditemukan. Silakan login kembali.");
         }
 
-        // Endpoint berdasarkan role
+        // ⭐ Endpoint berdasarkan role
         const endpoint =
-          user.role === "Karyawan"
-            ? `${API_BASE_URL}/api/payroll/my-slip` // ✅ Endpoint baru
-            : `${API_BASE_URL}/api/payroll`;
+          user.role === "Admin"
+            ? `${API_BASE_URL}/api/payroll` // Admin pakai endpoint utama
+            : `${API_BASE_URL}/api/payroll/my-slip`; // HR/Karyawan pakai my-slip
 
         console.log("🔗 Fetching from:", endpoint);
 
@@ -174,7 +182,6 @@ export default function PaySlip() {
         console.log("📡 Response status:", response.status);
 
         if (!response.ok) {
-          // Handle berbagai error response
           if (response.status === 403) {
             throw new Error("Anda tidak memiliki akses ke resource ini.");
           } else if (response.status === 401) {
@@ -188,12 +195,13 @@ export default function PaySlip() {
 
         // Filter dan sort payrolls
         const myPayslips = payrolls
-          .filter((p) => Number(p.total_gaji) > 1000) // Filter gaji minimal
-          .sort((a, b) => b.periode.localeCompare(a.periode)); // Sort terbaru dulu
+          .filter((p) => Number(p.total_gaji) > 1000)
+          .sort((a, b) => b.periode.localeCompare(a.periode));
 
         console.log("Filtered payslips:", myPayslips);
 
         setAllPayslips(myPayslips);
+        setFilteredPayslips(myPayslips); // ⭐ Set filtered awal = semua
 
         if (myPayslips.length > 0) {
           setSelectedPeriod(myPayslips[0].periode);
@@ -208,6 +216,7 @@ export default function PaySlip() {
         console.error("Error fetching payslips:", e);
         setError(e.message || "Gagal memuat data slip gaji.");
         setAllPayslips([]);
+        setFilteredPayslips([]);
         setSlipData(null);
       } finally {
         setLoading(false);
@@ -219,10 +228,34 @@ export default function PaySlip() {
     }
   }, [user]);
 
+  // ⭐ TAMBAHAN: Handler untuk pilih karyawan (Admin only)
+  const handleEmployeeChange = (e) => {
+    const empId = e.target.value ? parseInt(e.target.value) : null;
+    setSelectedEmployee(empId);
+
+    // Filter payslips berdasarkan employee yang dipilih
+    const filtered = empId
+      ? allPayslips.filter((p) => p.employee_id === empId)
+      : allPayslips;
+
+    setFilteredPayslips(filtered);
+
+    // Set periode dan slip data pertama dari hasil filter
+    if (filtered.length > 0) {
+      setSelectedPeriod(filtered[0].periode);
+      setSlipData(filtered[0]);
+    } else {
+      setSelectedPeriod("");
+      setSlipData(null);
+    }
+  };
+
   const handlePeriodChange = (e) => {
     const period = e.target.value;
     setSelectedPeriod(period);
-    const selectedSlip = allPayslips.find((p) => p.periode === period);
+
+    // ⭐ Cari slip berdasarkan periode dan employee (jika ada)
+    const selectedSlip = filteredPayslips.find((p) => p.periode === period);
     setSlipData(selectedSlip || null);
   };
 
@@ -268,9 +301,12 @@ export default function PaySlip() {
 
       pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
 
-      const filename = `Slip_Gaji_${user?.username}_${formatPeriod(
-        slipData.periode
-      ).replace(/\s+/g, "_")}.pdf`;
+      const employeeName =
+        slipData.employee?.nama_lengkap || user?.username || "Karyawan";
+      const filename = `Slip_Gaji_${employeeName.replace(
+        /\s+/g,
+        "_"
+      )}_${formatPeriod(slipData.periode).replace(/\s+/g, "_")}.pdf`;
 
       pdf.save(filename);
     } catch (error) {
@@ -280,6 +316,20 @@ export default function PaySlip() {
       setIsGenerating(false);
     }
   };
+
+  // ⭐ TAMBAHAN: Ambil daftar karyawan unik untuk dropdown Admin
+  const uniqueEmployees = [
+    ...new Map(
+      allPayslips.map((p) => [
+        p.employee_id,
+        {
+          employee_id: p.employee_id,
+          nama: p.employee?.nama_lengkap || `Employee ${p.employee_id}`,
+          role: p.employee?.user?.role || p.employee_role || "-",
+        },
+      ])
+    ).values(),
+  ];
 
   if (loading) {
     return (
@@ -319,25 +369,70 @@ export default function PaySlip() {
       <h1 style={styles.header}>Slip Gaji Karyawan</h1>
 
       <div style={styles.card}>
-        <div style={styles.formElement}>
-          <label style={styles.label}>Pilih Periode Gaji</label>
-          <select
-            style={styles.select}
-            value={selectedPeriod}
-            onChange={handlePeriodChange}
-            disabled={allPayslips.length === 0}
-          >
-            {allPayslips.length === 0 ? (
-              <option value="">-- Belum ada data gaji --</option>
-            ) : (
-              allPayslips.map((p) => (
-                <option key={p.payroll_id} value={p.periode}>
-                  {formatPeriod(p.periode)}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
+        {/* ⭐ TAMPILAN BERBEDA: Admin punya 2 dropdown, Karyawan/HR hanya 1 */}
+        {isAdmin ? (
+          <div style={styles.formRow}>
+            {/* Dropdown Pilih Karyawan */}
+            <div style={{ ...styles.formElement, flex: 1 }}>
+              <label style={styles.label}>Pilih Karyawan</label>
+              <select
+                style={styles.select}
+                value={selectedEmployee || ""}
+                onChange={handleEmployeeChange}
+                disabled={allPayslips.length === 0}
+              >
+                <option value="">-- Semua Karyawan --</option>
+                {uniqueEmployees.map((emp) => (
+                  <option key={emp.employee_id} value={emp.employee_id}>
+                    {emp.nama} ({emp.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Dropdown Pilih Periode */}
+            <div style={{ ...styles.formElement, flex: 1 }}>
+              <label style={styles.label}>Pilih Periode Gaji</label>
+              <select
+                style={styles.select}
+                value={selectedPeriod}
+                onChange={handlePeriodChange}
+                disabled={filteredPayslips.length === 0}
+              >
+                {filteredPayslips.length === 0 ? (
+                  <option value="">-- Belum ada data gaji --</option>
+                ) : (
+                  filteredPayslips.map((p) => (
+                    <option key={p.payroll_id} value={p.periode}>
+                      {formatPeriod(p.periode)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          </div>
+        ) : (
+          // Tampilan untuk Karyawan/HR (hanya dropdown periode)
+          <div style={styles.formElement}>
+            <label style={styles.label}>Pilih Periode Gaji</label>
+            <select
+              style={styles.select}
+              value={selectedPeriod}
+              onChange={handlePeriodChange}
+              disabled={allPayslips.length === 0}
+            >
+              {allPayslips.length === 0 ? (
+                <option value="">-- Belum ada data gaji --</option>
+              ) : (
+                allPayslips.map((p) => (
+                  <option key={p.payroll_id} value={p.periode}>
+                    {formatPeriod(p.periode)}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+        )}
       </div>
 
       {slipData ? (
@@ -387,8 +482,9 @@ export default function PaySlip() {
                   Role/Jabatan:
                 </p>
                 <p style={{ margin: "0.3rem 0", color: "#333" }}>
-                  {slipData.employee?.jabatan ||
+                  {slipData.employee?.user?.role ||
                     slipData.employee_role ||
+                    slipData.employee?.jabatan ||
                     user?.role}
                 </p>
                 <p style={{ color: "#666", margin: "0.3rem 0" }}>

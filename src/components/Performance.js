@@ -301,8 +301,12 @@ export default function Performance() {
               );
 
               // Tentukan nama dan role dengan fallback
-              const employeeName = emp?.nama_lengkap || p.employee_id;
-              const employeeRole = emp?.role || "-";
+              const employeeName =
+                emp?.nama_lengkap || p.employee?.nama_lengkap || p.employee_id;
+
+              // ⭐ PRIORITAS: Ambil role dari employee.user.role (data terbaru dari Users table)
+              const employeeRole =
+                p.employee?.user?.role || p.role || emp?.user?.role || "-";
 
               return (
                 <tr

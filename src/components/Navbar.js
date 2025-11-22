@@ -129,6 +129,23 @@ const icons = {
       <polyline points="17 6 23 6 23 12"></polyline>
     </svg>
   ),
+  // ⭐ NEW: Clock icon untuk Approvals
+  clock: (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>
+  ),
   logout: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -364,6 +381,19 @@ export default function Navbar() {
           <span>Absensi</span>
         </NavLink>
 
+        {/* ⭐ NEW: Approvals (Hanya Admin & HR) */}
+        {hasRole("Admin", "HR") && (
+          <NavLink
+            to="/approvals"
+            style={getLinkStyle("approvals")}
+            onMouseEnter={() => setHoveredLink("approvals")}
+            onMouseLeave={() => setHoveredLink(null)}
+          >
+            {icons.clock}
+            <span>Approvals</span>
+          </NavLink>
+        )}
+
         {/* Payroll (Hanya Admin & HR) */}
         {hasRole("Admin", "HR") && (
           <NavLink
@@ -400,17 +430,15 @@ export default function Navbar() {
         </NavLink>
 
         {/* Talenta (Hanya Admin & HR) */}
-        {hasRole("Admin", "HR") && (
-          <NavLink
-            to="/performance"
-            style={getLinkStyle("performance")}
-            onMouseEnter={() => setHoveredLink("performance")}
-            onMouseLeave={() => setHoveredLink(null)}
-          >
-            {icons.trending}
-            <span>Talenta</span>
-          </NavLink>
-        )}
+        <NavLink
+          to="/performance"
+          style={getLinkStyle("performance")}
+          onMouseEnter={() => setHoveredLink("performance")}
+          onMouseLeave={() => setHoveredLink(null)}
+        >
+          {icons.trending}
+          <span>Talenta</span>
+        </NavLink>
       </div>
 
       {/* User Info dan Logout Section */}

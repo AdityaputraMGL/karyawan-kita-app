@@ -8,7 +8,6 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
-  // Pastikan forgotPassword dan resetPassword diexport di AuthContext
   const { login, register, forgotPassword, resetPassword } = useAuth();
 
   // State untuk Login
@@ -17,6 +16,7 @@ export default function Login() {
 
   // State untuk Register
   const [rUsername, setRU] = useState("");
+  const [rNamaLengkap, setRNamaLengkap] = useState(""); // ⭐ TAMBAHAN BARU
   const [rEmail, setRE] = useState("");
   const [rPass, setRP] = useState("");
   const [rPass2, setRP2] = useState("");
@@ -28,6 +28,13 @@ export default function Login() {
   const [resetToken, setResetToken] = useState("");
   const [newPass, setNewPass] = useState("");
   const [newPass2, setNewPass2] = useState("");
+
+  // State untuk show/hide password
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRPass, setShowRPass] = useState(false);
+  const [showRPass2, setShowRPass2] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showNewPass2, setShowNewPass2] = useState(false);
 
   // --- FUNGSI LOGIN/REGISTER/ETC ---
   const onLogin = async (e) => {
@@ -49,6 +56,10 @@ export default function Login() {
     e.preventDefault();
     setErr("");
     setSuccess("");
+    // Validasi nama lengkap
+    if (!rNamaLengkap.trim()) {
+      return setErr("Nama lengkap wajib diisi");
+    }
     if (rPass !== rPass2) return setErr("Konfirmasi password tidak cocok");
     if (rPass.length < 6) return setErr("Password minimal 6 karakter");
     setLoading(true);
@@ -59,6 +70,7 @@ export default function Login() {
         email: rEmail.trim(),
         role: rRole,
         status_karyawan: rStatusKaryawan,
+        nama_lengkap: rNamaLengkap.trim(), // ⭐ KIRIM NAMA LENGKAP KE BACKEND
       });
       navigate("/dashboard");
     } catch (e) {
@@ -68,7 +80,6 @@ export default function Login() {
     }
   };
 
-  // FUNGSI INI AKAN MEMANGGIL ENDPOINT BARU /forgot-password
   const onForgetPassword = async (e) => {
     e.preventDefault();
     setErr("");
@@ -77,18 +88,15 @@ export default function Login() {
     try {
       const result = await forgotPassword(forgotEmail.trim());
 
-      // 1. Set pesan sukses
       setSuccess(
         result.message ||
           "Link reset password telah dikirim ke email Anda. Silakan cek inbox/spam."
       );
 
-      // 2. Jika ada devToken dari backend (untuk local/debugging), set tokennya
       if (result.devToken) {
         setResetToken(result.devToken);
       }
 
-      // 3. PAKSA PINDAH TAB ke 'reset' (sesuai permintaan user)
       setTab("reset");
     } catch (e) {
       const errorMessage =
@@ -101,7 +109,6 @@ export default function Login() {
     }
   };
 
-  // FUNGSI INI AKAN MEMANGGIL ENDPOINT BARU /reset-password
   const onResetPassword = async (e) => {
     e.preventDefault();
     setErr("");
@@ -121,7 +128,6 @@ export default function Login() {
 
       setTimeout(() => setTab("login"), 2000);
     } catch (e) {
-      // e.response.data.error jika menggunakan axios
       const errorMessage =
         e.response?.data?.error ||
         e.message ||
@@ -133,7 +139,7 @@ export default function Login() {
   };
 
   // ------------------------------------------------------------------
-  // INLINE STYLES (Dibiarkan sama persis dengan yang Anda berikan)
+  // INLINE STYLES
   // ------------------------------------------------------------------
   const INPUT_STYLE = {
     width: "100%",
@@ -180,6 +186,25 @@ export default function Login() {
     formElement: {
       display: "flex",
       flexDirection: "column",
+    },
+    passwordWrapper: {
+      position: "relative",
+      width: "100%",
+    },
+    eyeButton: {
+      position: "absolute",
+      right: "16px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: "4px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#999",
+      transition: "color 0.2s ease",
     },
     paragraph: {
       margin: "0 0 8px 0",
@@ -239,26 +264,19 @@ export default function Login() {
       xmlns="http://www.w3.org/2000/svg"
       style={{ margin: "0 auto 16px" }}
     >
-      {/* Background Circle */}
       <circle cx="35" cy="35" r="33" fill="rgba(255,255,255,0.15)" />
-
-      {/* People Icon - Left Person */}
       <circle cx="24" cy="26" r="5" fill="white" opacity="0.9" />
       <path
         d="M24 33C19 33 16 35 16 38V42H32V38C32 35 29 33 24 33Z"
         fill="white"
         opacity="0.9"
       />
-
-      {/* People Icon - Right Person */}
       <circle cx="46" cy="26" r="5" fill="white" opacity="0.9" />
       <path
         d="M46 33C41 33 38 35 38 38V42H54V38C54 35 51 33 46 33Z"
         fill="white"
         opacity="0.9"
       />
-
-      {/* Document/System Icon */}
       <rect
         x="26"
         y="46"
@@ -295,17 +313,45 @@ export default function Login() {
     </svg>
   );
 
+  // Eye Icon Components
+  const EyeIcon = () => (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+
+  const EyeOffIcon = () => (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+
   return (
     <div
       style={{
-        minHeight: "100vh",
         height: "100%",
         width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: "20px",
+        padding: "0",
         position: "fixed",
         top: 0,
         left: 0,
@@ -317,10 +363,11 @@ export default function Login() {
       <div
         style={{
           width: "100%",
-          maxWidth: "900px",
+          height: "100%",
+          maxWidth: "none",
           background: "white",
-          borderRadius: "20px",
-          boxShadow: "0 25px 80px rgba(0,0,0,0.35)",
+          borderRadius: "0",
+          boxShadow: "none",
           overflow: "hidden",
           display: "grid",
           gridTemplateColumns: "1fr",
@@ -409,9 +456,20 @@ export default function Login() {
         </div>
 
         {/* Content */}
-        <div style={{ padding: "48px 80px 56px" }}>
+        <div
+          style={{
+            padding: "48px 80px 56px",
+            flex: 1, // ← Mengisi ruang tersedia
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center", // ← Konten di tengah vertikal
+            maxWidth: "900px", // ← Batasi lebar form agar tetap rapi
+            margin: "0 auto", // ← Center horizontal
+            width: "100%",
+          }}
+        >
           {/* Error Message */}
-          {err && <div style={styles.errorMessage}>⚠️ {err}</div>}
+          {err && <div style={styles.errorMessage}>⚠ {err}</div>}
           {/* Success Message */}
           {success && <div style={styles.successMessage}>✓ {success}</div>}
 
@@ -443,23 +501,36 @@ export default function Login() {
               </div>
               <div style={styles.formElement}>
                 <label style={styles.label}>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setP(e.target.value)}
-                  required
-                  placeholder="Masukkan password"
-                  style={INPUT_STYLE}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#5C54A4";
-                    e.target.style.boxShadow =
-                      "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "#e0e0e0";
-                    e.target.style.boxShadow = "none";
-                  }}
-                />
+                <div style={styles.passwordWrapper}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setP(e.target.value)}
+                    required
+                    placeholder="Masukkan password"
+                    style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={styles.eyeButton}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "#5C54A4")
+                    }
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#999")}
+                  >
+                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
               </div>
 
               <div
@@ -488,8 +559,8 @@ export default function Login() {
                     type="button"
                     onClick={() => {
                       setTab("forget");
-                      setErr(""); // Clear errors saat pindah tab
-                      setSuccess(""); // Clear success message saat pindah tab
+                      setErr("");
+                      setSuccess("");
                     }}
                     style={styles.linkButton}
                   >
@@ -548,47 +619,98 @@ export default function Login() {
                 </div>
               </div>
 
+              {/* ⭐ INPUT NAMA LENGKAP - TAMBAHAN BARU */}
+              <div style={styles.formElement}>
+                <label style={styles.label}>Nama Lengkap</label>
+                <input
+                  value={rNamaLengkap}
+                  onChange={(e) => setRNamaLengkap(e.target.value)}
+                  required
+                  placeholder="Masukkan nama lengkap Anda"
+                  style={INPUT_STYLE}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#5C54A4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#e0e0e0";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+              </div>
+
               <div style={styles.twoColumnGrid}>
                 <div style={styles.formElement}>
                   <label style={styles.label}>Password</label>
-                  <input
-                    type="password"
-                    value={rPass}
-                    onChange={(e) => setRP(e.target.value)}
-                    required
-                    minLength={6}
-                    placeholder="Min. 6 karakter"
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
+                  <div style={styles.passwordWrapper}>
+                    <input
+                      type={showRPass ? "text" : "password"}
+                      value={rPass}
+                      onChange={(e) => setRP(e.target.value)}
+                      required
+                      minLength={6}
+                      placeholder="Min. 6 karakter"
+                      style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#5C54A4";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#e0e0e0";
+                        e.target.style.boxShadow = "none";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRPass(!showRPass)}
+                      style={styles.eyeButton}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = "#5C54A4")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = "#999")
+                      }
+                    >
+                      {showRPass ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
                 </div>
                 <div style={styles.formElement}>
                   <label style={styles.label}>Konfirmasi Password</label>
-                  <input
-                    type="password"
-                    value={rPass2}
-                    onChange={(e) => setRP2(e.target.value)}
-                    required
-                    placeholder="Ulangi password"
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
+                  <div style={styles.passwordWrapper}>
+                    <input
+                      type={showRPass2 ? "text" : "password"}
+                      value={rPass2}
+                      onChange={(e) => setRP2(e.target.value)}
+                      required
+                      placeholder="Ulangi password"
+                      style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#5C54A4";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#e0e0e0";
+                        e.target.style.boxShadow = "none";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRPass2(!showRPass2)}
+                      style={styles.eyeButton}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = "#5C54A4")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = "#999")
+                      }
+                    >
+                      {showRPass2 ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -703,8 +825,8 @@ export default function Login() {
                   type="button"
                   onClick={() => {
                     setTab("login");
-                    setErr(""); // Clear errors saat pindah tab
-                    setSuccess(""); // Clear success message saat pindah tab
+                    setErr("");
+                    setSuccess("");
                   }}
                   style={styles.linkButton}
                 >
@@ -750,44 +872,74 @@ export default function Login() {
               <div style={styles.twoColumnGrid}>
                 <div style={styles.formElement}>
                   <label style={styles.label}>Password Baru</label>
-                  <input
-                    type="password"
-                    value={newPass}
-                    onChange={(e) => setNewPass(e.target.value)}
-                    required
-                    minLength={6}
-                    placeholder="Min. 6 karakter"
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
+                  <div style={styles.passwordWrapper}>
+                    <input
+                      type={showNewPass ? "text" : "password"}
+                      value={newPass}
+                      onChange={(e) => setNewPass(e.target.value)}
+                      required
+                      minLength={6}
+                      placeholder="Min. 6 karakter"
+                      style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#5C54A4";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#e0e0e0";
+                        e.target.style.boxShadow = "none";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPass(!showNewPass)}
+                      style={styles.eyeButton}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = "#5C54A4")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = "#999")
+                      }
+                    >
+                      {showNewPass ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
                 </div>
                 <div style={styles.formElement}>
                   <label style={styles.label}>Konfirmasi Password</label>
-                  <input
-                    type="password"
-                    value={newPass2}
-                    onChange={(e) => setNewPass2(e.target.value)}
-                    required
-                    placeholder="Ulangi password"
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
+                  <div style={styles.passwordWrapper}>
+                    <input
+                      type={showNewPass2 ? "text" : "password"}
+                      value={newPass2}
+                      onChange={(e) => setNewPass2(e.target.value)}
+                      required
+                      placeholder="Ulangi password"
+                      style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#5C54A4";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#e0e0e0";
+                        e.target.style.boxShadow = "none";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPass2(!showNewPass2)}
+                      style={styles.eyeButton}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = "#5C54A4")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = "#999")
+                      }
+                    >
+                      {showNewPass2 ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <button

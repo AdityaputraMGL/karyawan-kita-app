@@ -1,20 +1,20 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AddEmployee from "./components/AddEmployee";
 import AdminDashboard from "./components/AdminDashboard";
+import ApprovalManagement from "./components/ApprovalManagement";
 import Attendance from "./components/Attendance";
-import EmployeeDashboard from "./components/EmployeeDashboard"; // Digunakan untuk HR dan Karyawan
+import EmployeeDashboard from "./components/EmployeeDashboard";
 import EmployeeDetail from "./components/EmployeeDetail";
 import EmployeeList from "./components/EmployeeList";
 import Leave from "./components/Leave";
 import Login from "./components/Login";
 import Navbar from "./components/Navbar";
 import Payroll from "./components/Payroll";
+import PaySlip from "./components/PaySlip";
 import Performance from "./components/Performance";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RequireRole from "./components/RequireRole";
 import { useAuth } from "./context/AuthContext";
-// ⭐ Impor komponen Slip Gaji
-import PaySlip from "./components/PaySlip";
 
 // --- START: Inline Styles untuk Layout Sidebar ---
 const SIDEBAR_WIDTH = "220px";
@@ -61,31 +61,28 @@ export default function App() {
                 )
               }
             />
-                        {/* Data Karyawan: Admin & HR */}           {" "}
+            {/* Data Karyawan: Admin & HR */}
             <Route element={<RequireRole allow={["Admin", "HR"]} />}>
-                           {" "}
-              <Route path="/employees" element={<EmployeeList />} />           
-                <Route path="/employee/:id" element={<EmployeeDetail />} />     
-                      <Route path="/add-employee" element={<AddEmployee />} /> 
-                       {" "}
+              <Route path="/employees" element={<EmployeeList />} />
+              <Route path="/employee/:id" element={<EmployeeDetail />} />
+              <Route path="/add-employee" element={<AddEmployee />} />
             </Route>
-                        {/* Absensi: Semua boleh akses */}
-                        <Route path="/attendance" element={<Attendance />} />   
-                    {/* Payroll: Admin & HR */}           {" "}
+            {/* Absensi: Semua boleh akses */}
+            <Route path="/attendance" element={<Attendance />} />
+            {/* Approvals: Admin & HR only */}
             <Route element={<RequireRole allow={["Admin", "HR"]} />}>
-                            <Route path="/payroll" element={<Payroll />} />     
-                   {" "}
+              <Route path="/approvals" element={<ApprovalManagement />} />
+            </Route>
+            {/* Payroll: Admin & HR */}{" "}
+            <Route element={<RequireRole allow={["Admin", "HR"]} />}>
+              <Route path="/payroll" element={<Payroll />} />{" "}
             </Route>
             {/* ⭐ SLIP GAJI: Semua Role boleh akses */}
-            <Route path="/payslip" element={<PaySlip />} />           {" "}
+            <Route path="/payslip" element={<PaySlip />} />{" "}
             {/* Cuti: Semua boleh akses */}
-                        <Route path="/leave" element={<Leave />} />           {" "}
-            {/* Performance/Talenta: Admin & HR */}           {" "}
-            <Route element={<RequireRole allow={["Admin", "HR"]} />}>
-                           {" "}
-              <Route path="/performance" element={<Performance />} />           {" "}
-            </Route>
-                     {" "}
+            <Route path="/leave" element={<Leave />} />{" "}
+            {/* Performance/Talenta: Admin & HR */}{" "}
+            <Route path="/performance" element={<Performance />} />             {" "}
           </Route>
                    {" "}
           <Route

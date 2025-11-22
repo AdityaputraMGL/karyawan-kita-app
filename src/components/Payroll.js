@@ -182,7 +182,7 @@ export default function Payroll() {
     }
   };
 
-  // Calculate Auto Deduction
+  // ⭐ FIXED Calculate Auto Deduction
   const calculateAutoDeduction = useCallback(
     async (employeeId, periode) => {
       if (!employeeId || !periode) {
@@ -199,18 +199,26 @@ export default function Payroll() {
       }
 
       try {
+        console.log("🔍 Calculating for:", { employeeId, periode });
+
         const allAttendance = await attendance.findAll();
         const allLeaves = await leave.findAll();
 
-        const normalizedEmployeeId = String(employeeId).toLowerCase().trim();
+        // ⭐ FIX: Convert ke number untuk comparison yang benar
+        const targetEmployeeId = parseInt(employeeId);
         const [year, month] = periode.split("-");
 
-        // Filter Absensi
+        console.log(
+          "  Target employee_id:",
+          targetEmployeeId,
+          typeof targetEmployeeId
+        );
+        console.log("  Period:", { year, month });
+
+        // ⭐ FIX: Filter Absensi dengan parseInt
         const employeeAttendance = allAttendance.filter((a) => {
-          const attendanceEmployeeId = String(a.employee_id)
-            .toLowerCase()
-            .trim();
-          if (attendanceEmployeeId !== normalizedEmployeeId) return false;
+          const aEmpId = parseInt(a.employee_id);
+          if (aEmpId !== targetEmployeeId) return false;
 
           const attendanceDate = new Date(a.tanggal);
           const attendanceYear = attendanceDate.getFullYear().toString();
@@ -221,15 +229,19 @@ export default function Payroll() {
           return attendanceYear === year && attendanceMonth === month;
         });
 
+        console.log("  Found attendances:", employeeAttendance.length);
+
         // Hitung ALPA
         const alpaCount = employeeAttendance.filter(
-          (a) => a.status === "alpa"
+          (a) => a.status?.toLowerCase() === "alpa"
         ).length;
         const potonganAlpa = alpaCount * POTONGAN_ALPA;
 
+        console.log("  Alpa:", alpaCount, "days =", potonganAlpa);
+
         // Hitung TERLAMBAT
         const lateRecords = employeeAttendance.filter((a) => {
-          if (!a.jam_masuk || a.status !== "hadir") return false;
+          if (!a.jam_masuk || a.status?.toLowerCase() !== "hadir") return false;
           const timeParts = a.jam_masuk.split(":");
           const hour = Number(timeParts[0]);
           const minute = Number(timeParts[1]);
@@ -238,56 +250,60 @@ export default function Payroll() {
         const lateCount = lateRecords.length;
         const potonganTerlambat = lateCount * POTONGAN_TERLAMBAT;
 
+        console.log("  Terlambat:", lateCount, "times =", potonganTerlambat);
+
         // Hitung Izin & Sakit dari absensi
         let izinCount = employeeAttendance.filter(
-          (a) => a.status === "izin"
+          (a) => a.status?.toLowerCase() === "izin"
         ).length;
         let sakitCount = employeeAttendance.filter(
-          (a) => a.status === "sakit"
+          (a) => a.status?.toLowerCase() === "sakit"
         ).length;
 
-        // Tambahkan dari Leave/Cuti yang approved
+        console.log("  Izin dari attendance:", izinCount);
+        console.log("  Sakit dari attendance:", sakitCount);
+
+        // ⭐ FIX: Filter Leave dengan parseInt
         const employeeLeaves = allLeaves.filter((l) => {
-          if (!l.employee_id) return false;
-          const leaveEmployeeId = String(l.employee_id).toLowerCase().trim();
-          if (leaveEmployeeId !== normalizedEmployeeId) return false;
-          if (l.status !== "approved") return false;
+          const lEmpId = parseInt(l.employee_id);
+          if (lEmpId !== targetEmployeeId) return false;
+          if (l.status?.toLowerCase() !== "approved") return false;
 
-          const dateField =
-            l.tanggal_mulai || l.tanggal_pengajuan || l.start_date;
-          if (!dateField) return false;
-
-          const isoDateField = dateField + "T00:00:00.000Z";
-          const startDate = new Date(isoDateField);
-
-          const startYear = startDate.getUTCFullYear().toString();
-          const startMonth = String(startDate.getUTCMonth() + 1).padStart(
-            2,
-            "0"
-          );
+          const startDate = new Date(l.tanggal_mulai);
+          const startYear = startDate.getFullYear().toString();
+          const startMonth = String(startDate.getMonth() + 1).padStart(2, "0");
 
           return startYear === year && startMonth === month;
         });
 
+        console.log("  Found approved leaves:", employeeLeaves.length);
+
         // Hitung durasi cuti
-        employeeLeaves.forEach((lv) => {
-          const startDate = new Date(lv.tanggal_mulai + "T00:00:00.000Z");
-          const endDate = new Date(lv.tanggal_selesai + "T00:00:00.000Z");
+        employeeLeaves.forEach((lv, idx) => {
+          const startDate = new Date(lv.tanggal_mulai);
+          const endDate = new Date(lv.tanggal_selesai);
 
           const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
           const oneDay = 1000 * 60 * 60 * 24;
           const diffDays = Math.round(diffTime / oneDay) + 1;
 
-          const jenisField =
-            lv.jenis_pengajuan || lv.jenis_cuti || lv.jenis || "";
-          const jenisLower = String(jenisField).toLowerCase();
+          console.log(`  Leave ${idx + 1}:`, {
+            jenis: lv.jenis_pengajuan,
+            start: lv.tanggal_mulai,
+            end: lv.tanggal_selesai,
+            days: diffDays,
+          });
 
-          if (jenisLower.includes("izin") || jenisLower.includes("cuti")) {
-            izinCount += diffDays;
-          } else if (jenisLower.includes("sakit")) {
+          const jenisLower = String(lv.jenis_pengajuan || "").toLowerCase();
+
+          // ⭐ FIX: Semua jenis cuti/izin kena potongan kecuali sakit
+          if (jenisLower.includes("sakit")) {
             sakitCount += diffDays;
+            console.log(`    -> Added to sakit: ${diffDays} days`);
           } else {
+            // Default: Izin/Cuti semua kena potongan
             izinCount += diffDays;
+            console.log(`    -> Added to izin/cuti: ${diffDays} days`);
           }
         });
 
@@ -297,6 +313,10 @@ export default function Payroll() {
 
         const totalPotongan =
           potonganAlpa + potonganTerlambat + potonganIzin + potonganSakit;
+
+        console.log("  TOTAL Izin/Cuti:", izinCount, "days =", potonganIzin);
+        console.log("  TOTAL Sakit:", sakitCount, "days =", potonganSakit);
+        console.log("  TOTAL POTONGAN:", totalPotongan);
 
         // Buat Breakdown & Alasan
         const breakdown = [];
@@ -362,9 +382,11 @@ export default function Payroll() {
           potongan: totalPotongan,
           alasan_potongan: alasanPotongan,
         }));
+
+        console.log("✅ Calculation completed!");
       } catch (e) {
         setError("Gagal menghitung potongan: " + e.message);
-        console.error("Deduction calc error:", e);
+        console.error("❌ Deduction calc error:", e);
       }
     },
     [formatRupiah]
@@ -385,7 +407,7 @@ export default function Payroll() {
     if (field === "employee_id") {
       employeeIdToCalculate = value;
       const selectedEmployee = employeesData.find(
-        (e) => e.employee_id === value
+        (e) => e.employee_id === parseInt(value)
       );
 
       updatedForm.gaji_pokok = selectedEmployee?.gaji_pokok || 5000000;
@@ -431,13 +453,14 @@ export default function Payroll() {
 
     try {
       const employeeData = employeesData.find(
-        (e) => e.employee_id === form.employee_id
+        (e) => e.employee_id === parseInt(form.employee_id)
       );
       const employeeRole =
         employeeData?.jabatan || employeeData?.role || "Karyawan";
 
       await payroll.create({
         ...form,
+        employee_id: parseInt(form.employee_id),
         employee_role: employeeRole,
         total_gaji: calcTotal(),
         alasan_potongan: form.alasan_potongan || "Tidak ada potongan",
@@ -545,7 +568,7 @@ export default function Payroll() {
             <option value="">- Pilih Karyawan -</option>
             {employeesData.map((e) => (
               <option key={e.employee_id} value={e.employee_id}>
-                {e.nama_lengkap}
+                {e.nama_lengkap} (ID: {e.employee_id})
               </option>
             ))}
           </select>
@@ -781,7 +804,7 @@ export default function Payroll() {
                       onClick={() => deletePayroll(p.payroll_id)}
                       title="Hapus data payroll"
                     >
-                      🗑️ Hapus
+                      🗑 Hapus
                     </button>
                   </td>
                 </tr>

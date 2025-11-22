@@ -32,7 +32,7 @@ apiClient.interceptors.request.use(
       console.log("  - ✅ Token found, adding to headers");
       config.headers.Authorization = `Bearer ${token}`;
     } else {
-      console.log("  - ⚠️ No token found in localStorage");
+      console.log("  - ⚠ No token found in localStorage");
     }
 
     return config;
@@ -190,6 +190,41 @@ export function resetPassword(token, newPassword) {
   return apiClient.post("/users/reset-password", { token, newPassword });
 }
 
+// ✅ TAMBAHAN: Fix Employee - create employee for existing user
+export async function fixEmployee() {
+  try {
+    console.log("🔧 Attempting to fix employee...");
+    const res = await apiClient.post("/users/fix-employee");
+    console.log("✅ Fix employee response:", res.data);
+
+    const { token, employee_id, message } = res.data;
+
+    // Update token jika ada token baru
+    if (token) {
+      console.log("💾 Updating token in localStorage");
+      localStorage.setItem(LS.userToken, token);
+
+      // Update current user data dengan employee_id baru
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        currentUser.employee_id = employee_id;
+        localStorage.setItem(LS.currentUser, JSON.stringify(currentUser));
+        console.log("✅ User data updated with employee_id:", employee_id);
+      }
+    }
+
+    return res.data;
+  } catch (error) {
+    console.error("❌ Fix employee error:", error);
+    const errorMsg =
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      error.message ||
+      "Gagal membuat employee";
+    throw new Error(errorMsg);
+  }
+}
+
 // Helper untuk memastikan response adalah array
 const ensureArray = (data) => {
   if (data && typeof data === "object" && Array.isArray(data.data)) {
@@ -268,15 +303,15 @@ export const employee = {
 
   delete: async (id) => {
     try {
-      console.log(`📤 Deleting payroll ID: ${id}`);
-      await apiClient.delete(`/payroll/${id}`);
-      console.log("✅ Payroll deleted");
+      console.log(`📤 Deleting employee ID: ${id}`);
+      await apiClient.delete(`/employees/${id}`);
+      console.log("✅ Employee deleted");
     } catch (error) {
-      console.error("❌ Error deleting payroll:", error);
+      console.error("❌ Error deleting employee:", error);
       const errorMsg =
         error.response?.data?.error ||
         error.message ||
-        "Gagal menghapus payroll.";
+        "Gagal menghapus employee.";
       throw new Error(errorMsg);
     }
   },

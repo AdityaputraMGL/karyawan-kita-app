@@ -361,49 +361,6 @@ export default function AdminDashboard() {
             total gaji terhitung
           </small>
         </div>
-
-        {/* Tips */}
-        <div
-          style={{
-            backgroundColor: "#2C3150",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "1.1rem",
-              fontWeight: "500",
-              marginBottom: "0.8rem",
-              color: "rgba(255, 255, 255, 0.8)",
-            }}
-          >
-            Tips
-          </h3>
-          <p
-            style={{
-              fontSize: "0.9rem",
-              lineHeight: "1.5",
-              color: "rgba(255, 255, 255, 0.7)",
-            }}
-          >
-            Semua data ini berasal dari mock API{" "}
-            <code
-              style={{
-                backgroundColor: "rgba(255, 255, 255, 0.15)",
-                color: "#fff",
-                padding: "0.2rem 0.4rem",
-                borderRadius: "4px",
-                fontSize: "0.85rem",
-              }}
-            >
-              localStorage
-            </code>
-            . Nanti sambungkan ke backend cukup di{" "}
-            <strong style={{ color: "#4B0082" }}>services/api.js</strong>.
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -120,6 +120,34 @@ const styles = {
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
   },
+  warningCard: {
+    backgroundColor: "#3A4068",
+    borderRadius: "8px",
+    padding: "1rem",
+    marginBottom: "1rem",
+    borderLeft: "4px solid #FFA726",
+  },
+  pendingCard: {
+    backgroundColor: "#3A4068",
+    borderRadius: "8px",
+    padding: "1rem",
+    marginBottom: "1rem",
+    borderLeft: "4px solid #FFA726",
+  },
+  approvedCard: {
+    backgroundColor: "#3A4068",
+    borderRadius: "8px",
+    padding: "1rem",
+    marginBottom: "1rem",
+    borderLeft: "4px solid #4CAF50",
+  },
+  rejectedCard: {
+    backgroundColor: "#3A4068",
+    borderRadius: "8px",
+    padding: "1rem",
+    marginBottom: "1rem",
+    borderLeft: "4px solid #f44336",
+  },
 };
 
 export default function Attendance() {
@@ -138,8 +166,9 @@ export default function Attendance() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState(null);
+  const [pendingRequest, setPendingRequest] = useState(null);
+  const [requestLoading, setRequestLoading] = useState(false);
 
-  // ✅ PERBAIKAN: Gunakan useRef untuk watchId agar tidak trigger re-render
   const watchIdRef = useRef(null);
 
   const [form, setForm] = useState({
@@ -148,10 +177,14 @@ export default function Attendance() {
     jam_masuk: "",
     jam_pulang: "",
     status: "hadir",
-    tipe_kerja: "WFO",
+    tipe_kerja: "WFO (Work From Office)",
   });
 
-  // Fungsi pemeriksaan absen hari ini
+  const [wfhRequestForm, setWfhRequestForm] = useState({
+    tanggal: new Date().toISOString().split("T")[0],
+    tipe_kerja: "WFH (Work From Home)",
+  });
+
   const checkTodayAttendance = useCallback(
     (allAttendance) => {
       const today = new Date().toISOString().split("T")[0];
@@ -161,38 +194,38 @@ export default function Attendance() {
           a.tanggal.split("T")[0] === today
       );
       setTodayAttendance(todayData || null);
+
+      if (todayData && todayData.approval_status === "pending") {
+        setPendingRequest(todayData);
+      } else {
+        setPendingRequest(null);
+      }
     },
     [loggedInEmployeeId]
   );
 
-  // ✅ PERBAIKAN: Fungsi refresh yang digabungkan dan sudah lengkap
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       console.log("🔄 Refreshing data...");
 
-      // ✅ FIX: Fetch attendance terlebih dahulu (semua role bisa akses)
       const allAttendance = await attendance.findAll();
       console.log("✅ Attendance loaded:", allAttendance.length);
 
-      // ✅ FIX: Hanya fetch employees jika Admin/HR (punya akses)
       let allEmployees = [];
       if (canSeeAllData) {
         try {
-          // Hanya gunakan .findAll() karena API service sudah handle .data
           allEmployees = await employee.findAll();
           console.log("✅ Employees loaded:", allEmployees.length);
         } catch (empError) {
           console.log(
-            "⚠️ Could not load employees (normal for Karyawan):",
+            "⚠ Could not load employees (normal for Karyawan):",
             empError.message
           );
-          // Tidak perlu throw error, karena Karyawan memang tidak perlu data employees
         }
       }
 
-      // Filter attendance berdasarkan role
       let filteredAttendance = allAttendance;
       if (!canSeeAllData && loggedInEmployeeId) {
         filteredAttendance = allAttendance.filter(
@@ -229,9 +262,8 @@ export default function Attendance() {
     } finally {
       setLoading(false);
     }
-  }, [canSeeAllData, loggedInEmployeeId, checkTodayAttendance]); // Dependencies sudah benar
+  }, [canSeeAllData, loggedInEmployeeId, checkTodayAttendance]);
 
-  // ✅ PERBAIKAN: Fungsi location tracking yang tidak menyebabkan loop
   const startLocationTracking = useCallback(() => {
     if (!navigator.geolocation) {
       setLocationError("Browser Anda tidak mendukung Geolocation");
@@ -240,12 +272,10 @@ export default function Attendance() {
 
     setLocationLoading(true);
 
-    // Hentikan watch yang lama
     if (watchIdRef.current) {
       navigator.geolocation.clearWatch(watchIdRef.current);
     }
 
-    // Opsi maksimal untuk akurasi tinggi
     const options = {
       enableHighAccuracy: true,
       timeout: 30000,
@@ -256,7 +286,7 @@ export default function Attendance() {
     let bestLocation = null;
     let attempts = 0;
     const maxAttempts = 5;
-    const targetAccuracy = 30; // Target akurasi 30m
+    const targetAccuracy = 30;
 
     console.log("🔍 Starting GPS lock... (target: <30m accuracy)");
 
@@ -272,7 +302,6 @@ export default function Attendance() {
             )}m`
           );
 
-          // Update jika dapat akurasi lebih baik
           if (accuracy < bestAccuracy) {
             bestAccuracy = accuracy;
             bestLocation = {
@@ -282,23 +311,18 @@ export default function Attendance() {
               timestamp: new Date().toISOString(),
             };
 
-            // Update UI dengan lokasi terbaru
             setCurrentLocation(bestLocation);
             setLocationLoading(false);
             setLocationError(null);
           }
 
-          // Jika sudah dapat akurasi bagus atau sudah max attempts
           if (accuracy <= targetAccuracy || attempts >= maxAttempts) {
             console.log(
               `✅ GPS locked! Final accuracy: ${Math.round(bestAccuracy)}m`
             );
             setLocationLoading(false);
-
-            // Start watching untuk real-time updates
             startWatchingLocation();
           } else {
-            // Coba lagi setelah 2 detik
             setTimeout(tryGetBetterLocation, 2000);
           }
         },
@@ -337,7 +361,6 @@ export default function Attendance() {
             timestamp: new Date().toISOString(),
           };
 
-          // Update hanya jika akurasi membaik
           if (position.coords.accuracy < bestAccuracy) {
             bestAccuracy = position.coords.accuracy;
             setCurrentLocation(location);
@@ -357,10 +380,8 @@ export default function Attendance() {
       watchIdRef.current = id;
     };
 
-    // Mulai proses mendapatkan lokasi terbaik
     tryGetBetterLocation();
   }, []);
-  // ✅ Empty dependencies - hanya dibuat sekali
 
   const retryLocation = () => {
     setLocationError(null);
@@ -368,7 +389,6 @@ export default function Attendance() {
     startLocationTracking();
   };
 
-  // ✅ PERBAIKAN: UseEffect yang tidak menyebabkan infinite loop
   useEffect(() => {
     console.log("🔵 Component mounted, loading data...");
     console.log("👤 Current user:", user);
@@ -376,25 +396,106 @@ export default function Attendance() {
 
     refresh();
 
-    // Start location tracking untuk non-admin
     if (!isAdmin) {
       startLocationTracking();
     }
 
-    // Cleanup function
     return () => {
       if (watchIdRef.current) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         console.log("🧹 Cleanup: Location tracking stopped");
       }
     };
-  }, [isAdmin, refresh, startLocationTracking, user]); // Tambahkan dependencies yang benar
+  }, [isAdmin, refresh, startLocationTracking, user]);
 
-  // Fungsi absen masuk
+  const requestWFH = async () => {
+    if (!wfhRequestForm.tanggal || !wfhRequestForm.tipe_kerja) {
+      alert("⚠ Tanggal dan tipe kerja wajib diisi!");
+      return;
+    }
+
+    setRequestLoading(true);
+
+    try {
+      const TOKEN_KEY = "hr_userToken";
+      const token = localStorage.getItem(TOKEN_KEY);
+
+      console.log("📤 Requesting WFH/Hybrid...");
+
+      const response = await fetch(
+        "http://localhost:5000/api/attendance/request-wfh",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(wfhRequestForm),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal mengirim request");
+      }
+
+      console.log("✅ Request berhasil:", result);
+      alert(result.message || "✅ Request berhasil dikirim!");
+
+      setWfhRequestForm({
+        tanggal: new Date().toISOString().split("T")[0],
+        tipe_kerja: "WFH (Work From Home)",
+      });
+
+      refresh();
+    } catch (e) {
+      console.error("❌ Error requesting WFH:", e);
+      alert("Gagal mengirim request: " + e.message);
+    } finally {
+      setRequestLoading(false);
+    }
+  };
+
   const absenMasuk = async () => {
+    const selectedType = form.tipe_kerja;
+
+    if (selectedType === "WFH (Work From Home)" || selectedType === "Hybrid") {
+      if (!todayAttendance) {
+        alert(
+          "❌ Anda harus request WFH/Hybrid terlebih dahulu dan menunggu approval dari admin!\n\n" +
+            "Gunakan tombol 'Request WFH/Hybrid' di bawah."
+        );
+        return;
+      }
+
+      if (todayAttendance.approval_status === "pending") {
+        alert(
+          "⏳ Request WFH/Hybrid Anda masih menunggu approval dari admin.\n\n" +
+            "Harap tunggu hingga admin menyetujui request Anda."
+        );
+        return;
+      }
+
+      if (todayAttendance.approval_status === "rejected") {
+        alert(
+          "❌ Request WFH/Hybrid Anda ditolak oleh admin.\n\n" +
+            (todayAttendance.approval_notes
+              ? `Alasan: ${todayAttendance.approval_notes}`
+              : "Silakan hubungi admin untuk informasi lebih lanjut.")
+        );
+        return;
+      }
+
+      if (todayAttendance.approval_status !== "approved") {
+        alert("❌ Status approval tidak valid. Silakan request ulang.");
+        return;
+      }
+    }
+
     if (!currentLocation) {
       alert(
-        "⚠️ Lokasi belum terdeteksi. Mohon tunggu beberapa saat atau izinkan akses lokasi."
+        "⚠ Lokasi belum terdeteksi. Mohon tunggu beberapa saat atau izinkan akses lokasi."
       );
       return;
     }
@@ -405,7 +506,6 @@ export default function Attendance() {
     ).padStart(2, "0")}`;
     const today = now.toISOString().split("T")[0];
 
-    // ✅ FORMAT LOKASI: "latitude,longitude"
     const lokasiMasuk = `${currentLocation.latitude},${currentLocation.longitude}`;
     const akurasiMasuk = Math.round(currentLocation.accuracy);
 
@@ -413,43 +513,57 @@ export default function Attendance() {
     console.log("  - employee_id:", loggedInEmployeeId);
     console.log("  - lokasi_masuk:", lokasiMasuk);
     console.log("  - akurasi_masuk:", akurasiMasuk);
+    console.log("  - tipe_kerja:", selectedType);
 
     try {
-      const response = await attendance.create({
-        employee_id: loggedInEmployeeId,
-        tanggal: today,
-        jam_masuk: currentTime,
-        jam_pulang: null,
-        status: "hadir",
-        tipe_kerja: form.tipe_kerja,
-        recorded_by_role: user.role,
-        lokasi_masuk: lokasiMasuk, // ✅ PENTING!
-        akurasi_masuk: akurasiMasuk, // ✅ PENTING!
-      });
+      const TOKEN_KEY = "hr_userToken";
+      const token = localStorage.getItem(TOKEN_KEY);
 
-      console.log("✅ Attendance created:", response);
+      const response = await fetch(
+        "http://localhost:5000/api/attendance/checkin",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            employee_id: loggedInEmployeeId,
+            tanggal: today,
+            jam_masuk: currentTime,
+            tipe_kerja: selectedType,
+            lokasi_masuk: lokasiMasuk,
+            akurasi_masuk: akurasiMasuk,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal absen masuk");
+      }
+
+      console.log("✅ Check-in successful:", result);
       alert(
-        `✓ Absen Masuk berhasil pada ${currentTime}\nLokasi: ${lokasiMasuk}\nAkurasi: ${akurasiMasuk}m`
+        `✓ Absen Masuk berhasil pada ${currentTime}\nTipe: ${selectedType}\nLokasi: ${lokasiMasuk}\nAkurasi: ${akurasiMasuk}m`
       );
       refresh();
     } catch (e) {
-      console.error("❌ Error creating attendance:", e);
-      console.error("   Response data:", e.response?.data);
-      setError(e.message || "Gagal Absen Masuk.");
-      alert("Gagal Absen Masuk: " + (e.response?.data?.error || e.message));
+      console.error("❌ Error check-in:", e);
+      alert("Gagal Absen Masuk: " + e.message);
     }
   };
 
-  // Fungsi absen pulang
   const absenPulang = async () => {
     if (!todayAttendance) {
-      alert("⚠️ Anda belum absen masuk hari ini!");
+      alert("⚠ Anda belum absen masuk hari ini!");
       return;
     }
 
     if (!currentLocation) {
       alert(
-        "⚠️ Lokasi belum terdeteksi. Mohon tunggu beberapa saat atau izinkan akses lokasi."
+        "⚠ Lokasi belum terdeteksi. Mohon tunggu beberapa saat atau izinkan akses lokasi."
       );
       return;
     }
@@ -460,21 +574,39 @@ export default function Attendance() {
     ).padStart(2, "0")}`;
 
     try {
-      await attendance.update(todayAttendance.attendance_id, {
-        jam_pulang: currentTime,
-        lokasi_pulang: `${currentLocation.latitude},${currentLocation.longitude}`,
-        akurasi_pulang: Math.round(currentLocation.accuracy),
-      });
+      const TOKEN_KEY = "hr_userToken";
+      const token = localStorage.getItem(TOKEN_KEY);
+
+      const response = await fetch(
+        `http://localhost:5000/api/attendance/checkout/${todayAttendance.attendance_id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            jam_pulang: currentTime,
+            lokasi_pulang: `${currentLocation.latitude},${currentLocation.longitude}`,
+            akurasi_pulang: Math.round(currentLocation.accuracy),
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Gagal absen pulang");
+      }
 
       alert(`✓ Absen Pulang berhasil pada ${currentTime}`);
       refresh();
     } catch (e) {
-      setError(e.message || "Gagal Absen Pulang.");
-      alert("Gagal Absen Pulang: " + (e.response?.data?.error || e.message));
+      console.error("❌ Error check-out:", e);
+      alert("Gagal Absen Pulang: " + e.message);
     }
   };
 
-  // Submit manual
   const submitManual = async (e) => {
     e.preventDefault();
 
@@ -505,7 +637,7 @@ export default function Attendance() {
         jam_masuk: "",
         jam_pulang: "",
         status: "hadir",
-        tipe_kerja: "WFO",
+        tipe_kerja: "WFO (Work From Office)",
       });
       refresh();
       alert("✅ Absensi manual berhasil dicatat.");
@@ -522,12 +654,10 @@ export default function Attendance() {
     ).padStart(2, "0")}`;
   };
 
-  // Helper untuk mencari employee by ID
   const findEmployeeById = (empId) => {
     return employeesData.find((e) => e.employee_id === empId);
   };
 
-  // Helper untuk membuat URL Google Maps yang benar
   const createMapUrl = (locationString) => {
     if (!locationString || locationString === "MANUAL") return null;
     return `https://www.google.com/maps/search/?api=1&query=${locationString}`;
@@ -559,6 +689,12 @@ export default function Attendance() {
     );
   }
 
+  const needsApproval = (tipeKerja) => {
+    return tipeKerja === "WFH (Work From Home)" || tipeKerja === "Hybrid";
+  };
+
+  const selectedTypeNeedsApproval = needsApproval(form.tipe_kerja);
+
   return (
     <div style={styles.mainContainer}>
       <style>{`
@@ -570,7 +706,6 @@ export default function Attendance() {
 
       <h1 style={styles.title}>Absensi</h1>
 
-      {/* Quick Absen untuk Karyawan & HR */}
       {!isAdmin && (
         <div style={styles.quickAbsenCard}>
           <h3
@@ -584,7 +719,6 @@ export default function Attendance() {
             ⚡ Quick Absen - {getCurrentTime()}
           </h3>
 
-          {/* Real-time Location Display */}
           {locationLoading && (
             <div style={styles.locationLoading}>
               <div style={styles.spinner}></div>
@@ -667,8 +801,8 @@ export default function Attendance() {
                 {currentLocation.accuracy < 20 && " ✓ Sangat Akurat"}
                 {currentLocation.accuracy >= 20 &&
                   currentLocation.accuracy < 50 &&
-                  " ⚠️ Cukup Akurat"}
-                {currentLocation.accuracy >= 50 && " ⚠️ Kurang Akurat"}
+                  " ⚠ Cukup Akurat"}
+                {currentLocation.accuracy >= 50 && " ⚠ Kurang Akurat"}
               </div>
               <div
                 style={{
@@ -682,8 +816,100 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* Info Status Absen Hari Ini */}
-          {todayAttendance && (
+          {pendingRequest && pendingRequest.approval_status === "pending" && (
+            <div style={styles.pendingCard}>
+              <strong>⏳ Request WFH/Hybrid Pending</strong>
+              <div
+                style={{
+                  marginTop: "0.5rem",
+                  fontSize: "14px",
+                  color: "rgba(255,255,255,0.9)",
+                }}
+              >
+                Tanggal:{" "}
+                <strong>
+                  {new Date(pendingRequest.tanggal).toLocaleDateString("id-ID")}
+                </strong>
+                <br />
+                Tipe: <strong>{pendingRequest.tipe_kerja}</strong>
+                <br />
+                Status: <strong>Menunggu Approval Admin</strong>
+              </div>
+              <div
+                style={{
+                  marginTop: "0.5rem",
+                  fontSize: "13px",
+                  color: "rgba(255,255,255,0.7)",
+                }}
+              >
+                💡 Anda bisa absen setelah admin menyetujui request Anda
+              </div>
+            </div>
+          )}
+
+          {todayAttendance &&
+            todayAttendance.approval_status === "approved" &&
+            needsApproval(todayAttendance.tipe_kerja) &&
+            !todayAttendance.jam_masuk && (
+              <div style={styles.approvedCard}>
+                <strong>✅ Request Disetujui!</strong>
+                <div
+                  style={{
+                    marginTop: "0.5rem",
+                    fontSize: "14px",
+                    color: "rgba(255,255,255,0.9)",
+                  }}
+                >
+                  Tipe: <strong>{todayAttendance.tipe_kerja}</strong>
+                  <br />
+                  Status: <strong>Approved - Siap Absen</strong>
+                </div>
+                <div
+                  style={{
+                    marginTop: "0.5rem",
+                    fontSize: "13px",
+                    color: "rgba(255,255,255,0.7)",
+                  }}
+                >
+                  🎉 Silakan absen masuk sekarang!
+                </div>
+              </div>
+            )}
+
+          {todayAttendance &&
+            todayAttendance.approval_status === "rejected" && (
+              <div style={styles.rejectedCard}>
+                <strong>❌ Request Ditolak</strong>
+                <div
+                  style={{
+                    marginTop: "0.5rem",
+                    fontSize: "14px",
+                    color: "rgba(255,255,255,0.9)",
+                  }}
+                >
+                  Tipe: <strong>{todayAttendance.tipe_kerja}</strong>
+                  <br />
+                  Status: <strong>Rejected</strong>
+                  {todayAttendance.approval_notes && (
+                    <>
+                      <br />
+                      Alasan: <strong>{todayAttendance.approval_notes}</strong>
+                    </>
+                  )}
+                </div>
+                <div
+                  style={{
+                    marginTop: "0.5rem",
+                    fontSize: "13px",
+                    color: "rgba(255,255,255,0.7)",
+                  }}
+                >
+                  💡 Silakan hubungi admin atau request ulang
+                </div>
+              </div>
+            )}
+
+          {todayAttendance && todayAttendance.jam_masuk && (
             <div
               style={{
                 marginBottom: "1rem",
@@ -744,52 +970,164 @@ export default function Attendance() {
             </div>
           )}
 
-          {/* Pilih Tipe Kerja */}
           {!todayAttendance && (
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={styles.label}>Tipe Kerja Hari Ini:</label>
-              <select
-                value={form.tipe_kerja}
-                onChange={(e) =>
-                  setForm({ ...form, tipe_kerja: e.target.value })
-                }
-                style={{
-                  ...styles.inputField,
-                  width: "100%",
-                  marginBottom: "1rem",
-                }}
-              >
-                <option value="WFO">WFO (Work From Office)</option>
-                <option value="WFH">WFH (Work From Home)</option>
-                <option value="Hybrid">Hybrid</option>
-              </select>
-            </div>
+            <>
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={styles.label}>Tipe Kerja Hari Ini:</label>
+                <select
+                  value={form.tipe_kerja}
+                  onChange={(e) =>
+                    setForm({ ...form, tipe_kerja: e.target.value })
+                  }
+                  style={{
+                    ...styles.inputField,
+                    width: "100%",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  <option value="WFO (Work From Office)">
+                    WFO (Work From Office)
+                  </option>
+                  <option value="WFH (Work From Home)">
+                    WFH (Work From Home)
+                  </option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
+
+              {selectedTypeNeedsApproval && (
+                <div style={styles.warningCard}>
+                  <div
+                    style={{
+                      color: "#fff",
+                      fontSize: "14px",
+                      marginBottom: "0.5rem",
+                    }}
+                  >
+                    <strong>⚠ Perlu Approval Admin</strong>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      color: "rgba(255,255,255,0.85)",
+                      marginBottom: "0.5rem",
+                    }}
+                  >
+                    WFH/Hybrid memerlukan persetujuan admin sebelum dapat absen.
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: "1rem",
+                      padding: "1rem",
+                      backgroundColor: "rgba(0,0,0,0.2)",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div style={{ marginBottom: "0.8rem" }}>
+                      <label
+                        style={{ ...styles.label, marginBottom: "0.3rem" }}
+                      >
+                        Tanggal:
+                      </label>
+                      <input
+                        type="date"
+                        value={wfhRequestForm.tanggal}
+                        onChange={(e) =>
+                          setWfhRequestForm({
+                            ...wfhRequestForm,
+                            tanggal: e.target.value,
+                          })
+                        }
+                        style={{ ...styles.inputField, width: "100%" }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "0.8rem" }}>
+                      <label
+                        style={{ ...styles.label, marginBottom: "0.3rem" }}
+                      >
+                        Tipe:
+                      </label>
+                      <select
+                        value={wfhRequestForm.tipe_kerja}
+                        onChange={(e) =>
+                          setWfhRequestForm({
+                            ...wfhRequestForm,
+                            tipe_kerja: e.target.value,
+                          })
+                        }
+                        style={{ ...styles.inputField, width: "100%" }}
+                      >
+                        <option value="WFH (Work From Home)">
+                          WFH (Work From Home)
+                        </option>
+                        <option value="Hybrid">Hybrid</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={requestWFH}
+                      disabled={requestLoading}
+                      style={{
+                        ...styles.btnPrimary,
+                        width: "100%",
+                        backgroundColor: requestLoading ? "#666" : "#FF9800",
+                        cursor: requestLoading ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {requestLoading
+                        ? "⏳ Mengirim..."
+                        : "📝 Request WFH/Hybrid"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Tombol Absen */}
-          <div style={{ display: "flex", gap: "1rem" }}>
+          <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
             <button
               onClick={absenMasuk}
-              disabled={todayAttendance !== null || !currentLocation}
+              disabled={
+                (todayAttendance && todayAttendance.jam_masuk) ||
+                !currentLocation ||
+                (selectedTypeNeedsApproval &&
+                  (!todayAttendance ||
+                    todayAttendance.approval_status !== "approved"))
+              }
               style={{
                 ...styles.absentBtn,
-                background: todayAttendance
-                  ? "#444"
-                  : !currentLocation
-                  ? "#666"
-                  : "#4caf50",
+                background:
+                  todayAttendance && todayAttendance.jam_masuk
+                    ? "#444"
+                    : !currentLocation
+                    ? "#666"
+                    : selectedTypeNeedsApproval &&
+                      (!todayAttendance ||
+                        todayAttendance.approval_status !== "approved")
+                    ? "#666"
+                    : "#4caf50",
                 color: "white",
                 cursor:
-                  todayAttendance || !currentLocation
+                  (todayAttendance && todayAttendance.jam_masuk) ||
+                  !currentLocation ||
+                  (selectedTypeNeedsApproval &&
+                    (!todayAttendance ||
+                      todayAttendance.approval_status !== "approved"))
                     ? "not-allowed"
                     : "pointer",
-                opacity: !currentLocation && !todayAttendance ? 0.7 : 1,
+                opacity: !currentLocation ? 0.7 : 1,
               }}
             >
-              {todayAttendance
+              {todayAttendance && todayAttendance.jam_masuk
                 ? "✓ Sudah Absen Masuk"
                 : !currentLocation
                 ? "⏳ Menunggu Lokasi..."
+                : selectedTypeNeedsApproval &&
+                  (!todayAttendance ||
+                    todayAttendance.approval_status !== "approved")
+                ? "🔒 Perlu Approval"
                 : "🏢 Absen Masuk Sekarang"}
             </button>
 
@@ -797,13 +1135,16 @@ export default function Attendance() {
               onClick={absenPulang}
               disabled={
                 !todayAttendance ||
+                !todayAttendance.jam_masuk ||
                 todayAttendance.jam_pulang ||
                 !currentLocation
               }
               style={{
                 ...styles.absentBtn,
                 background:
-                  !todayAttendance || todayAttendance?.jam_pulang
+                  !todayAttendance ||
+                  !todayAttendance.jam_masuk ||
+                  todayAttendance?.jam_pulang
                     ? "#444"
                     : !currentLocation
                     ? "#666"
@@ -811,6 +1152,7 @@ export default function Attendance() {
                 color: "white",
                 cursor:
                   !todayAttendance ||
+                  !todayAttendance.jam_masuk ||
                   todayAttendance?.jam_pulang ||
                   !currentLocation
                     ? "not-allowed"
@@ -818,6 +1160,7 @@ export default function Attendance() {
                 opacity:
                   !currentLocation &&
                   todayAttendance &&
+                  todayAttendance.jam_masuk &&
                   !todayAttendance.jam_pulang
                     ? 0.7
                     : 1,
@@ -825,7 +1168,7 @@ export default function Attendance() {
             >
               {todayAttendance?.jam_pulang
                 ? "✓ Sudah Absen Pulang"
-                : !todayAttendance
+                : !todayAttendance || !todayAttendance.jam_masuk
                 ? "🏠 Absen Pulang"
                 : !currentLocation
                 ? "⏳ Menunggu Lokasi..."
@@ -835,7 +1178,6 @@ export default function Attendance() {
         </div>
       )}
 
-      {/* Form Manual HANYA untuk Admin */}
       {isAdmin && (
         <form
           style={{ ...styles.card, ...styles.formGrid }}
@@ -921,8 +1263,10 @@ export default function Attendance() {
               value={form.tipe_kerja}
               onChange={(e) => setForm({ ...form, tipe_kerja: e.target.value })}
             >
-              <option value="WFO">WFO (Work From Office)</option>
-              <option value="WFH">WFH (Work From Home)</option>
+              <option value="WFO (Work From Office)">
+                WFO (Work From Office)
+              </option>
+              <option value="WFH (Work From Home)">WFH (Work From Home)</option>
               <option value="Hybrid">Hybrid</option>
             </select>
           </div>
@@ -941,7 +1285,6 @@ export default function Attendance() {
         </form>
       )}
 
-      {/* Tabel Absensi */}
       <div style={{ ...styles.card, padding: "0" }}>
         <table style={styles.table}>
           <thead style={styles.tableHeader}>
@@ -952,6 +1295,7 @@ export default function Attendance() {
               <th style={styles.th}>Pulang</th>
               <th style={styles.th}>Status</th>
               <th style={styles.th}>Tipe Kerja</th>
+              {canSeeAllData && <th style={styles.th}>Approval</th>}
               {canSeeAllData && <th style={styles.th}>Lokasi</th>}
               {canSeeAllData && <th style={styles.th}>Role Pencatat</th>}
             </tr>
@@ -971,10 +1315,17 @@ export default function Attendance() {
                   <td style={styles.td}>
                     {emp?.nama_lengkap || emp?.username || a.employee_id || "-"}
                   </td>
-                  <td style={styles.td}>{a.jam_masuk}</td>
+                  <td style={styles.td}>{a.jam_masuk || "-"}</td>
                   <td style={styles.td}>{a.jam_pulang || "-"}</td>
                   <td style={styles.td}>{a.status}</td>
                   <td style={styles.td}>{a.tipe_kerja || "WFO"}</td>
+                  {canSeeAllData && (
+                    <td style={styles.td}>
+                      {a.approval_status === "pending" && "⏳ Pending"}
+                      {a.approval_status === "approved" && "✅ Approved"}
+                      {a.approval_status === "rejected" && "❌ Rejected"}
+                    </td>
+                  )}
                   {canSeeAllData && (
                     <td style={styles.td}>
                       {a.lokasi_masuk ? (
@@ -1022,7 +1373,7 @@ export default function Attendance() {
             {list.length === 0 && (
               <tr>
                 <td
-                  colSpan={canSeeAllData ? "8" : "6"}
+                  colSpan={canSeeAllData ? "9" : "6"}
                   style={{ ...styles.td, textAlign: "center" }}
                 >
                   <i>Belum ada catatan absensi.</i>
