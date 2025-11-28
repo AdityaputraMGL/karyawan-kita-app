@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { leave } from "../services/api";
 
 // --- Inline Styles ---
 const styles = {
@@ -19,6 +18,28 @@ const styles = {
     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
     padding: "1.5rem",
     marginBottom: "1.5rem",
+  },
+  quotaCard: {
+    backgroundColor: "#3A4068",
+    borderRadius: "10px",
+    padding: "1.2rem",
+    marginBottom: "1.5rem",
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "1rem",
+  },
+  quotaItem: {
+    textAlign: "center",
+  },
+  quotaLabel: {
+    fontSize: "0.8rem",
+    color: "rgba(255, 255, 255, 0.6)",
+    marginBottom: "0.3rem",
+  },
+  quotaValue: {
+    fontSize: "1.8rem",
+    fontWeight: "700",
+    color: "#fff",
   },
   formGrid: {
     display: "grid",
@@ -81,6 +102,11 @@ const styles = {
     padding: "0.8rem 1.5rem",
     gridColumn: "1 / -1",
   },
+  btnDisabled: {
+    backgroundColor: "#555",
+    cursor: "not-allowed",
+    opacity: 0.5,
+  },
   table: {
     width: "100%",
     borderCollapse: "collapse",
@@ -101,117 +127,309 @@ const styles = {
     fontSize: "0.85rem",
     borderBottom: "1px solid #3A4068",
   },
+  warningBox: {
+    marginTop: "1rem",
+    padding: "0.8rem",
+    backgroundColor: "#4A2A2A",
+    borderRadius: "8px",
+    color: "#FF6347",
+    gridColumn: "1 / -1",
+  },
 };
 
 export default function Leave() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [quota, setQuota] = useState(null);
   const { user } = useAuth();
 
-  // State untuk form pengajuan
+  // State untuk form
   const [newLeaveData, setNewLeaveData] = useState({
     tanggal_mulai: "",
     tanggal_selesai: "",
     jenis_pengajuan: "Cuti",
     alasan: "",
-    employee_id: user?.employee_id || "",
   });
 
+  // ⭐ State untuk file upload
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  // Fungsi hitung hari
+  const calculateDays = (startDate, endDate) => {
+    if (!startDate || !endDate) return 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  };
+
+  // Fetch kuota cuti
+  const fetchLeaveQuota = useCallback(async () => {
+    if (user?.role === "Karyawan") {
+      try {
+        const response = await fetch("http://localhost:5000/api/leave/quota", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("hr_userToken")}`,
+          },
+        });
+        const data = await response.json();
+        if (response.ok) {
+          console.log("✅ Quota loaded:", data);
+          setQuota(data);
+        }
+      } catch (e) {
+        console.error("❌ Error fetching quota:", e);
+      }
+    }
+  }, [user]);
+
+  // Fetch leave requests
   const fetchLeaveRequests = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // ✅ Ambil semua data leave
-      let data = await leave.findAll();
+      const response = await fetch("http://localhost:5000/api/leave", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("hr_userToken")}`,
+        },
+      });
 
-      // Filter di frontend berdasarkan role
-      if (user && (user.role === "Admin" || user.role === "HR")) {
-        // Admin/HR melihat semua
+      const data = await response.json();
+
+      if (response.ok) {
         setList(data);
-      } else if (user && user.employee_id) {
-        // Karyawan hanya melihat milik sendiri
-        const myLeaves = data.filter((l) => l.employee_id === user.employee_id);
-        setList(myLeaves);
       } else {
-        setList([]);
+        throw new Error(data.error || "Failed to fetch");
       }
     } catch (e) {
       setError(e.message);
-      console.error("Gagal memuat data cuti:", e);
-      setList([]); // Set empty array saat error
+      console.error("❌ Error fetching leave:", e);
+      setList([]);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     if (user) {
       fetchLeaveRequests();
+      fetchLeaveQuota();
     }
-  }, [user, fetchLeaveRequests]);
+  }, [user, fetchLeaveRequests, fetchLeaveQuota]);
 
+  // Handle form change
   const handleFormChange = (e) => {
     setNewLeaveData({ ...newLeaveData, [e.target.name]: e.target.value });
   };
 
-  // Fungsi pengajuan cuti
+  // ⭐ Handle file change
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        alert("❌ Hanya file PDF yang diperbolehkan!");
+        e.target.value = "";
+        setSelectedFile(null);
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert("❌ Ukuran file maksimal 5MB!");
+        e.target.value = "";
+        setSelectedFile(null);
+        return;
+      }
+      console.log("✅ File selected:", file.name);
+      setSelectedFile(file);
+    }
+  };
+
+  // Submit leave request
   const handleSubmitLeave = async (e) => {
     e.preventDefault();
     setError(null);
+
+    console.log("📝 Starting leave submission...");
 
     if (!user?.employee_id) {
       alert("Employee ID tidak ditemukan. Silakan login ulang.");
       return;
     }
 
+    // ⭐ Validasi file untuk Sakit
+    if (newLeaveData.jenis_pengajuan === "Sakit" && !selectedFile) {
+      alert("❌ Surat keterangan sakit (PDF) wajib di-upload!");
+      return;
+    }
+
+    if (!newLeaveData.tanggal_mulai || !newLeaveData.tanggal_selesai) {
+      alert("Tanggal mulai dan selesai harus diisi!");
+      return;
+    }
+
+    if (!newLeaveData.alasan || newLeaveData.alasan.trim() === "") {
+      alert("Alasan harus diisi!");
+      return;
+    }
+
+    const requestedDays = calculateDays(
+      newLeaveData.tanggal_mulai,
+      newLeaveData.tanggal_selesai
+    );
+
+    if (requestedDays <= 0) {
+      alert(
+        "Tanggal selesai harus lebih besar atau sama dengan tanggal mulai!"
+      );
+      return;
+    }
+
+    // Validasi kuota untuk Cuti
+    if (newLeaveData.jenis_pengajuan === "Cuti" && quota) {
+      if (requestedDays > quota.remaining_days) {
+        alert(`❌ Kuota tidak mencukupi! Sisa: ${quota.remaining_days} hari.`);
+        return;
+      }
+    }
+
     try {
-      await leave.create({
-        ...newLeaveData,
-        employee_id: user.employee_id,
+      console.log("📤 Sending leave request...");
+
+      // ⭐ Kirim dengan FormData (untuk file upload)
+      const formData = new FormData();
+      formData.append("tanggal_mulai", newLeaveData.tanggal_mulai);
+      formData.append("tanggal_selesai", newLeaveData.tanggal_selesai);
+      formData.append("jenis_pengajuan", newLeaveData.jenis_pengajuan);
+      formData.append("alasan", newLeaveData.alasan);
+      formData.append("employee_id", user.employee_id);
+
+      if (selectedFile) {
+        formData.append("attachment", selectedFile);
+        console.log("  - Uploading file:", selectedFile.name);
+      }
+
+      const response = await fetch("http://localhost:5000/api/leave", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("hr_userToken")}`,
+          // ⚠️ JANGAN set Content-Type, biar browser auto-set
+        },
+        body: formData,
       });
 
-      alert("✅ Pengajuan cuti berhasil dikirim!");
-      fetchLeaveRequests();
+      const data = await response.json();
 
-      // Reset form
+      if (!response.ok) {
+        throw new Error(data.error || "Gagal mengajukan");
+      }
+
+      console.log("✅ Success:", data);
+      alert(`✅ ${data.message || "Pengajuan berhasil!"}`);
+
+      // Refresh & reset
+      await fetchLeaveRequests();
+      await fetchLeaveQuota();
+
       setNewLeaveData({
-        ...newLeaveData,
         tanggal_mulai: "",
         tanggal_selesai: "",
+        jenis_pengajuan: "Cuti",
         alasan: "",
       });
+      setSelectedFile(null);
+
+      // Reset file input
+      const fileInput = document.querySelector('input[type="file"]');
+      if (fileInput) fileInput.value = "";
     } catch (e) {
-      setError("Gagal mengajukan cuti: " + e.message);
-      alert("❌ Gagal mengajukan cuti: " + e.message);
+      console.error("❌ Error:", e);
+      const errorMsg = "Gagal mengajukan: " + e.message;
+      setError(errorMsg);
+      alert("❌ " + errorMsg);
     }
   };
 
-  // Fungsi update status (Admin/HR)
+  // Update status (Admin/HR)
   const handleUpdateStatus = async (leaveId, status) => {
     setError(null);
     try {
-      await leave.updateStatus(leaveId, status);
-      alert(`✅ Status cuti berhasil diperbarui menjadi ${status}.`);
-      fetchLeaveRequests();
+      const response = await fetch(
+        `http://localhost:5000/api/leave/${leaveId}/status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("hr_userToken")}`,
+          },
+          body: JSON.stringify({ status }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update");
+      }
+
+      alert(`✅ Status berhasil diperbarui menjadi ${status}.`);
+      await fetchLeaveRequests();
+      await fetchLeaveQuota();
     } catch (e) {
-      setError("Gagal memperbarui status cuti: " + e.message);
+      setError("Gagal memperbarui status: " + e.message);
       alert("❌ Gagal memperbarui status: " + e.message);
     }
   };
 
-  // Tampilkan Loading/Error
   if (loading) {
     return <div style={styles.mainContainer}>Memuat data cuti...</div>;
   }
 
   const isAdminOrHR = user && (user.role === "Admin" || user.role === "HR");
+  const requestedDays = calculateDays(
+    newLeaveData.tanggal_mulai,
+    newLeaveData.tanggal_selesai
+  );
+  const quotaInsufficient =
+    newLeaveData.jenis_pengajuan === "Cuti" &&
+    quota &&
+    requestedDays > quota.remaining_days;
 
   return (
     <div style={styles.mainContainer}>
       <h1 style={styles.title}>📋 Pengajuan Cuti</h1>
 
-      {/* Form Pengajuan Cuti */}
+      {/* Kuota Cuti Bulanan */}
+      {user?.role === "Karyawan" && quota && (
+        <div style={styles.quotaCard}>
+          <div style={styles.quotaItem}>
+            <div style={styles.quotaLabel}>Kuota Bulan Ini</div>
+            <div style={styles.quotaValue}>{quota.total_quota} Hari</div>
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "rgba(255,255,255,0.5)",
+                marginTop: "0.5rem",
+              }}
+            >
+              {quota.month || "Bulan ini"}
+            </div>
+          </div>
+          <div style={styles.quotaItem}>
+            <div style={styles.quotaLabel}>Terpakai</div>
+            <div style={{ ...styles.quotaValue, color: "#FF6347" }}>
+              {quota.used_days} Hari
+            </div>
+          </div>
+          <div style={styles.quotaItem}>
+            <div style={styles.quotaLabel}>Sisa</div>
+            <div style={{ ...styles.quotaValue, color: "#4CAF50" }}>
+              {quota.remaining_days} Hari
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form Pengajuan */}
       <div style={styles.card}>
         <h3
           style={{
@@ -263,11 +481,61 @@ export default function Leave() {
             </select>
           </div>
 
+          {/* Jumlah Hari */}
+          {newLeaveData.tanggal_mulai && newLeaveData.tanggal_selesai && (
+            <div style={styles.formElement}>
+              <label style={styles.label}>Jumlah Hari</label>
+              <div
+                style={{
+                  ...styles.inputField,
+                  backgroundColor: quotaInsufficient ? "#6B3434" : "#4A5080",
+                  fontWeight: "700",
+                  fontSize: "1rem",
+                  color: quotaInsufficient ? "#FF6347" : "#4CAF50",
+                }}
+              >
+                {requestedDays} Hari
+              </div>
+            </div>
+          )}
+
+          {/* ⭐ FILE UPLOAD UNTUK SAKIT */}
+          {newLeaveData.jenis_pengajuan === "Sakit" && (
+            <div style={{ ...styles.formElement, gridColumn: "1 / -1" }}>
+              <label style={styles.label}>
+                Surat Keterangan Sakit (PDF){" "}
+                <span style={{ color: "#FF6347" }}>*</span>
+              </label>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileChange}
+                style={{
+                  ...styles.inputField,
+                  cursor: "pointer",
+                }}
+                required
+              />
+              {selectedFile && (
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#4CAF50",
+                    marginTop: "0.5rem",
+                  }}
+                >
+                  ✓ File: {selectedFile.name} (
+                  {(selectedFile.size / 1024).toFixed(2)} KB)
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ ...styles.formElement, gridColumn: "1 / -1" }}>
             <label style={styles.label}>Alasan</label>
             <textarea
               name="alasan"
-              placeholder="Jelaskan alasan pengajuan cuti..."
+              placeholder="Jelaskan alasan pengajuan..."
               value={newLeaveData.alasan}
               onChange={handleFormChange}
               style={styles.textareaField}
@@ -275,24 +543,27 @@ export default function Leave() {
             />
           </div>
 
-          <button type="submit" style={{ ...styles.btn, ...styles.btnAjukan }}>
-            📤 Ajukan Cuti
+          {quotaInsufficient && (
+            <div style={styles.warningBox}>
+              ⚠️ Kuota cuti tidak mencukupi! Anda memiliki{" "}
+              {quota.remaining_days} hari tersisa.
+            </div>
+          )}
+
+          <button
+            type="submit"
+            style={{
+              ...styles.btn,
+              ...styles.btnAjukan,
+              ...(quotaInsufficient ? styles.btnDisabled : {}),
+            }}
+            disabled={quotaInsufficient}
+          >
+            📤 Ajukan
           </button>
         </form>
 
-        {error && (
-          <div
-            style={{
-              marginTop: "1rem",
-              padding: "0.8rem",
-              backgroundColor: "#4A2A2A",
-              borderRadius: "8px",
-              color: "#FF6347",
-            }}
-          >
-            ⚠️ {error}
-          </div>
-        )}
+        {error && <div style={styles.warningBox}>⚠️ {error}</div>}
       </div>
 
       {/* Tabel Daftar Pengajuan */}
@@ -305,7 +576,9 @@ export default function Leave() {
               <th style={styles.th}>Jenis</th>
               <th style={styles.th}>Mulai</th>
               <th style={styles.th}>Selesai</th>
+              <th style={styles.th}>Hari</th>
               <th style={styles.th}>Alasan</th>
+              {isAdminOrHR && <th style={styles.th}>Lampiran</th>}
               <th style={styles.th}>Status</th>
               {isAdminOrHR && <th style={styles.th}>Aksi</th>}
             </tr>
@@ -314,7 +587,7 @@ export default function Leave() {
             {list.length === 0 ? (
               <tr>
                 <td
-                  colSpan={isAdminOrHR ? 8 : 6}
+                  colSpan={isAdminOrHR ? 10 : 7}
                   style={{ ...styles.td, textAlign: "center", color: "#999" }}
                 >
                   <i>Belum ada data cuti.</i>
@@ -336,7 +609,30 @@ export default function Leave() {
                   <td style={styles.td}>
                     {new Date(l.tanggal_selesai).toLocaleDateString("id-ID")}
                   </td>
+                  <td style={styles.td}>
+                    <strong>{l.total_days || 0}</strong>
+                  </td>
                   <td style={styles.td}>{l.alasan}</td>
+                  {isAdminOrHR && (
+                    <td style={styles.td}>
+                      {l.attachment_filename ? (
+                        <a
+                          href={`http://localhost:5000/api/leave/attachment/${l.attachment_filename}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: "#4CAF50",
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                          }}
+                        >
+                          📄 Lihat PDF
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                  )}
                   <td style={styles.td}>
                     <span
                       style={{

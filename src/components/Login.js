@@ -16,8 +16,11 @@ export default function Login() {
 
   // State untuk Register
   const [rUsername, setRU] = useState("");
-  const [rNamaLengkap, setRNamaLengkap] = useState(""); // ⭐ TAMBAHAN BARU
+  const [rNamaLengkap, setRNamaLengkap] = useState("");
   const [rEmail, setRE] = useState("");
+  const [rAlamat, setRAlamat] = useState("");
+  const [rNoHP, setRNoHP] = useState("");
+  const [rJabatan, setRJabatan] = useState("");
   const [rPass, setRP] = useState("");
   const [rPass2, setRP2] = useState("");
   const [rRole, setRRole] = useState("Karyawan");
@@ -31,10 +34,8 @@ export default function Login() {
 
   // State untuk show/hide password
   const [showPassword, setShowPassword] = useState(false);
-  const [showRPass, setShowRPass] = useState(false);
-  const [showRPass2, setShowRPass2] = useState(false);
+  const [showRegisterPass, setShowRegisterPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
-  const [showNewPass2, setShowNewPass2] = useState(false);
 
   // --- FUNGSI LOGIN/REGISTER/ETC ---
   const onLogin = async (e) => {
@@ -56,21 +57,31 @@ export default function Login() {
     e.preventDefault();
     setErr("");
     setSuccess("");
-    // Validasi nama lengkap
+
     if (!rNamaLengkap.trim()) {
       return setErr("Nama lengkap wajib diisi");
     }
+
     if (rPass !== rPass2) return setErr("Konfirmasi password tidak cocok");
     if (rPass.length < 6) return setErr("Password minimal 6 karakter");
+
+    if (rNoHP && !/^[0-9+\-\s()]+$/.test(rNoHP)) {
+      return setErr("Nomor HP tidak valid");
+    }
+
     setLoading(true);
     try {
       await register({
         username: rUsername.trim(),
         password: rPass,
+        confirmPassword: rPass2,
         email: rEmail.trim(),
         role: rRole,
         status_karyawan: rStatusKaryawan,
-        nama_lengkap: rNamaLengkap.trim(), // ⭐ KIRIM NAMA LENGKAP KE BACKEND
+        nama_lengkap: rNamaLengkap.trim(),
+        alamat: rAlamat.trim() || null,
+        no_hp: rNoHP.trim() || null,
+        jabatan: rJabatan.trim() || null,
       });
       navigate("/dashboard");
     } catch (e) {
@@ -138,9 +149,7 @@ export default function Login() {
     }
   };
 
-  // ------------------------------------------------------------------
   // INLINE STYLES
-  // ------------------------------------------------------------------
   const INPUT_STYLE = {
     width: "100%",
     padding: "16px 20px",
@@ -345,13 +354,14 @@ export default function Login() {
   return (
     <div
       style={{
+        minHeight: "100vh",
         height: "100%",
         width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: "0",
+        padding: "20px",
         position: "fixed",
         top: 0,
         left: 0,
@@ -363,11 +373,10 @@ export default function Login() {
       <div
         style={{
           width: "100%",
-          height: "100%",
-          maxWidth: "none",
+          maxWidth: "900px",
           background: "white",
-          borderRadius: "0",
-          boxShadow: "none",
+          borderRadius: "20px",
+          boxShadow: "0 25px 80px rgba(0,0,0,0.35)",
           overflow: "hidden",
           display: "grid",
           gridTemplateColumns: "1fr",
@@ -456,21 +465,8 @@ export default function Login() {
         </div>
 
         {/* Content */}
-        <div
-          style={{
-            padding: "48px 80px 56px",
-            flex: 1, // ← Mengisi ruang tersedia
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center", // ← Konten di tengah vertikal
-            maxWidth: "900px", // ← Batasi lebar form agar tetap rapi
-            margin: "0 auto", // ← Center horizontal
-            width: "100%",
-          }}
-        >
-          {/* Error Message */}
+        <div style={{ padding: "48px 80px 56px" }}>
           {err && <div style={styles.errorMessage}>⚠ {err}</div>}
-          {/* Success Message */}
           {success && <div style={styles.successMessage}>✓ {success}</div>}
 
           {/* LOGIN FORM */}
@@ -575,83 +571,194 @@ export default function Login() {
           {tab === "register" && (
             <form
               onSubmit={onRegister}
-              style={{ display: "flex", flexDirection: "column", gap: "22px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
             >
-              <div style={styles.twoColumnGrid}>
-                <div style={styles.formElement}>
-                  <label style={styles.label}>Username</label>
-                  <input
-                    value={rUsername}
-                    onChange={(e) => setRU(e.target.value)}
-                    required
-                    placeholder="Username"
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
-                </div>
-                <div style={styles.formElement}>
-                  <label style={styles.label}>Email</label>
-                  <input
-                    type="email"
-                    value={rEmail}
-                    onChange={(e) => setRE(e.target.value)}
-                    required
-                    placeholder="email@example.com"
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
+              <div
+                style={{
+                  padding: "14px 18px",
+                  background:
+                    "linear-gradient(135deg, #f8f7ff 0%, #faf9ff 100%)",
+                  borderLeft: "4px solid #5C54A4",
+                  borderRadius: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#5C54A4",
+                    fontSize: "13px",
+                    fontWeight: "500",
+                  }}
+                >
+                  ✨ Lengkapi data di bawah ini untuk membuat akun
+                </p>
+              </div>
+
+              {/* SECTION 1: Informasi Akun */}
+              <div>
+                <h3
+                  style={{
+                    margin: "0 0 16px 0",
+                    fontSize: "15px",
+                    fontWeight: "600",
+                    color: "#333",
+                    borderBottom: "2px solid #f0f0f0",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  📋 Informasi Akun
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "18px",
+                  }}
+                >
+                  <div style={styles.twoColumnGrid}>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>
+                        Username <span style={{ color: "#ff4444" }}>*</span>
+                      </label>
+                      <input
+                        value={rUsername}
+                        onChange={(e) => setRU(e.target.value)}
+                        required
+                        placeholder="Username unik Anda"
+                        style={INPUT_STYLE}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#5C54A4";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#e0e0e0";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>
+                        Email <span style={{ color: "#ff4444" }}>*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={rEmail}
+                        onChange={(e) => setRE(e.target.value)}
+                        required
+                        placeholder="email@example.com"
+                        style={INPUT_STYLE}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#5C54A4";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#e0e0e0";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={styles.twoColumnGrid}>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>
+                        Password <span style={{ color: "#ff4444" }}>*</span>
+                      </label>
+                      <div style={styles.passwordWrapper}>
+                        <input
+                          type={showRegisterPass ? "text" : "password"}
+                          value={rPass}
+                          onChange={(e) => setRP(e.target.value)}
+                          required
+                          minLength={6}
+                          placeholder="Min. 6 karakter"
+                          style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = "#5C54A4";
+                            e.target.style.boxShadow =
+                              "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = "#e0e0e0";
+                            e.target.style.boxShadow = "none";
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegisterPass(!showRegisterPass)}
+                          style={styles.eyeButton}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = "#5C54A4")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = "#999")
+                          }
+                          title="Tampilkan/Sembunyikan Password"
+                        >
+                          {showRegisterPass ? <EyeOffIcon /> : <EyeIcon />}
+                        </button>
+                      </div>
+                    </div>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>
+                        Konfirmasi Password{" "}
+                        <span style={{ color: "#ff4444" }}>*</span>
+                      </label>
+                      <input
+                        type={showRegisterPass ? "text" : "password"}
+                        value={rPass2}
+                        onChange={(e) => setRP2(e.target.value)}
+                        required
+                        placeholder="Ulangi password"
+                        style={INPUT_STYLE}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#5C54A4";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#e0e0e0";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* ⭐ INPUT NAMA LENGKAP - TAMBAHAN BARU */}
-              <div style={styles.formElement}>
-                <label style={styles.label}>Nama Lengkap</label>
-                <input
-                  value={rNamaLengkap}
-                  onChange={(e) => setRNamaLengkap(e.target.value)}
-                  required
-                  placeholder="Masukkan nama lengkap Anda"
-                  style={INPUT_STYLE}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#5C54A4";
-                    e.target.style.boxShadow =
-                      "0 0 0 3px rgba(92, 84, 164, 0.1)";
+              {/* SECTION 2: Data Pribadi */}
+              <div>
+                <h3
+                  style={{
+                    margin: "8px 0 16px 0",
+                    fontSize: "15px",
+                    fontWeight: "600",
+                    color: "#333",
+                    borderBottom: "2px solid #f0f0f0",
+                    paddingBottom: "8px",
                   }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "#e0e0e0";
-                    e.target.style.boxShadow = "none";
+                >
+                  👤 Data Pribadi
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "18px",
                   }}
-                />
-              </div>
-
-              <div style={styles.twoColumnGrid}>
-                <div style={styles.formElement}>
-                  <label style={styles.label}>Password</label>
-                  <div style={styles.passwordWrapper}>
+                >
+                  <div style={styles.formElement}>
+                    <label style={styles.label}>
+                      Nama Lengkap <span style={{ color: "#ff4444" }}>*</span>
+                    </label>
                     <input
-                      type={showRPass ? "text" : "password"}
-                      value={rPass}
-                      onChange={(e) => setRP(e.target.value)}
+                      value={rNamaLengkap}
+                      onChange={(e) => setRNamaLengkap(e.target.value)}
                       required
-                      minLength={6}
-                      placeholder="Min. 6 karakter"
-                      style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                      placeholder="Masukkan nama lengkap sesuai KTP"
+                      style={INPUT_STYLE}
                       onFocus={(e) => {
                         e.target.style.borderColor = "#5C54A4";
                         e.target.style.boxShadow =
@@ -662,31 +769,76 @@ export default function Login() {
                         e.target.style.boxShadow = "none";
                       }}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowRPass(!showRPass)}
-                      style={styles.eyeButton}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = "#5C54A4")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.color = "#999")
-                      }
-                    >
-                      {showRPass ? <EyeOffIcon /> : <EyeIcon />}
-                    </button>
+                  </div>
+                  <div style={styles.twoColumnGrid}>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>Alamat</label>
+                      <input
+                        value={rAlamat}
+                        onChange={(e) => setRAlamat(e.target.value)}
+                        placeholder="Alamat lengkap tempat tinggal"
+                        style={INPUT_STYLE}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#5C54A4";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#e0e0e0";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>Nomor HP</label>
+                      <input
+                        value={rNoHP}
+                        onChange={(e) => setRNoHP(e.target.value)}
+                        placeholder="08xx xxxx xxxx"
+                        style={INPUT_STYLE}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#5C54A4";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#e0e0e0";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-                <div style={styles.formElement}>
-                  <label style={styles.label}>Konfirmasi Password</label>
-                  <div style={styles.passwordWrapper}>
+              </div>
+
+              {/* SECTION 3: Informasi Kepegawaian */}
+              <div>
+                <h3
+                  style={{
+                    margin: "8px 0 16px 0",
+                    fontSize: "15px",
+                    fontWeight: "600",
+                    color: "#333",
+                    borderBottom: "2px solid #f0f0f0",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  💼 Informasi Kepegawaian
+                </h3>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "18px",
+                  }}
+                >
+                  <div style={styles.formElement}>
+                    <label style={styles.label}>Jabatan</label>
                     <input
-                      type={showRPass2 ? "text" : "password"}
-                      value={rPass2}
-                      onChange={(e) => setRP2(e.target.value)}
-                      required
-                      placeholder="Ulangi password"
-                      style={{ ...INPUT_STYLE, paddingRight: "50px" }}
+                      value={rJabatan}
+                      onChange={(e) => setRJabatan(e.target.value)}
+                      placeholder="Contoh: Manager, Staff, Developer"
+                      style={INPUT_STYLE}
                       onFocus={(e) => {
                         e.target.style.borderColor = "#5C54A4";
                         e.target.style.boxShadow =
@@ -697,73 +849,64 @@ export default function Login() {
                         e.target.style.boxShadow = "none";
                       }}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowRPass2(!showRPass2)}
-                      style={styles.eyeButton}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = "#5C54A4")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.color = "#999")
-                      }
-                    >
-                      {showRPass2 ? <EyeOffIcon /> : <EyeIcon />}
-                    </button>
                   </div>
-                </div>
-              </div>
-
-              <div style={styles.twoColumnGrid}>
-                <div style={styles.formElement}>
-                  <label style={styles.label}>Status Karyawan</label>
-                  <select
-                    value={rStatusKaryawan}
-                    onChange={(e) => setRStatusKaryawan(e.target.value)}
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  >
-                    <option value="Magang">Magang</option>
-                    <option value="Kontrak">Kontrak</option>
-                    <option value="Tetap">Tetap</option>
-                  </select>
-                </div>
-                <div style={styles.formElement}>
-                  <label style={styles.label}>Role</label>
-                  <select
-                    value={rRole}
-                    onChange={(e) => setRRole(e.target.value)}
-                    style={INPUT_STYLE}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#5C54A4";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#e0e0e0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  >
-                    <option value="Karyawan">Karyawan</option>
-                  </select>
-                  <small style={styles.helpText}>
-                    Role Admin hanya dapat diberikan oleh Administrator
-                  </small>
+                  <div style={styles.twoColumnGrid}>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>
+                        Status Karyawan{" "}
+                        <span style={{ color: "#ff4444" }}>*</span>
+                      </label>
+                      <select
+                        value={rStatusKaryawan}
+                        onChange={(e) => setRStatusKaryawan(e.target.value)}
+                        style={INPUT_STYLE}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#5C54A4";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#e0e0e0";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      >
+                        <option value="Magang">Magang</option>
+                        <option value="Kontrak">Kontrak</option>
+                        <option value="Tetap">Tetap</option>
+                      </select>
+                    </div>
+                    <div style={styles.formElement}>
+                      <label style={styles.label}>
+                        Role <span style={{ color: "#ff4444" }}>*</span>
+                      </label>
+                      <select
+                        value={rRole}
+                        onChange={(e) => setRRole(e.target.value)}
+                        style={INPUT_STYLE}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#5C54A4";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#e0e0e0";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      >
+                        <option value="Karyawan">Karyawan</option>
+                      </select>
+                      <small style={styles.helpText}>
+                        💡 Role Admin hanya dapat diberikan oleh Administrator
+                      </small>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                style={{ ...BUTTON_SUBMIT_STYLE(loading), marginTop: "6px" }}
+                style={{ ...BUTTON_SUBMIT_STYLE(loading), marginTop: "12px" }}
                 onMouseEnter={(e) =>
                   !loading && (e.target.style.transform = "translateY(-1px)")
                 }
@@ -771,7 +914,7 @@ export default function Login() {
                   (e.target.style.transform = "translateY(0)")
                 }
               >
-                {loading ? "Memproses..." : "Daftar Sekarang"}
+                {loading ? "Memproses..." : "🚀 Daftar Sekarang"}
               </button>
             </form>
           )}
@@ -901,45 +1044,34 @@ export default function Login() {
                       onMouseLeave={(e) =>
                         (e.currentTarget.style.color = "#999")
                       }
+                      title="Tampilkan/Sembunyikan Password"
                     >
                       {showNewPass ? <EyeOffIcon /> : <EyeIcon />}
                     </button>
                   </div>
+                  <small style={styles.helpText}>
+                    👁️ Klik icon mata untuk menampilkan kedua password
+                  </small>
                 </div>
                 <div style={styles.formElement}>
                   <label style={styles.label}>Konfirmasi Password</label>
-                  <div style={styles.passwordWrapper}>
-                    <input
-                      type={showNewPass2 ? "text" : "password"}
-                      value={newPass2}
-                      onChange={(e) => setNewPass2(e.target.value)}
-                      required
-                      placeholder="Ulangi password"
-                      style={{ ...INPUT_STYLE, paddingRight: "50px" }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = "#5C54A4";
-                        e.target.style.boxShadow =
-                          "0 0 0 3px rgba(92, 84, 164, 0.1)";
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = "#e0e0e0";
-                        e.target.style.boxShadow = "none";
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPass2(!showNewPass2)}
-                      style={styles.eyeButton}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = "#5C54A4")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.color = "#999")
-                      }
-                    >
-                      {showNewPass2 ? <EyeOffIcon /> : <EyeIcon />}
-                    </button>
-                  </div>
+                  <input
+                    type={showNewPass ? "text" : "password"}
+                    value={newPass2}
+                    onChange={(e) => setNewPass2(e.target.value)}
+                    required
+                    placeholder="Ulangi password"
+                    style={INPUT_STYLE}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(92, 84, 164, 0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e0e0e0";
+                      e.target.style.boxShadow = "none";
+                    }}
+                  />
                 </div>
               </div>
               <button

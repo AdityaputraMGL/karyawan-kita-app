@@ -579,7 +579,7 @@ export const leave = {
   },
 };
 
-// PERFORMANCE
+// PERFORMANCE - Versi Lengkap dengan DELETE
 export const performance = {
   findAll: async () => {
     try {
@@ -590,6 +590,7 @@ export const performance = {
       throw error;
     }
   },
+
   create: async (payload) => {
     try {
       const res = await apiClient.post("/performance", payload);
@@ -602,6 +603,7 @@ export const performance = {
       throw new Error(errorMsg);
     }
   },
+
   update: async (id, payload) => {
     try {
       const res = await apiClient.put(`/performance/${id}`, payload);
@@ -611,6 +613,22 @@ export const performance = {
         error.response?.data?.error ||
         error.message ||
         "Gagal mengupdate data performa.";
+      throw new Error(errorMsg);
+    }
+  },
+
+  // ✅ FUNGSI DELETE BARU
+  delete: async (id) => {
+    try {
+      console.log(`🗑️ Deleting performance ID: ${id}`);
+      await apiClient.delete(`/performance/${id}`);
+      console.log("✅ Performance deleted");
+    } catch (error) {
+      console.error("❌ Error deleting performance:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal menghapus data performa.";
       throw new Error(errorMsg);
     }
   },
@@ -638,6 +656,35 @@ export const stats = {
         izin: 0,
         cutiPending: 0,
         gajiBulanIni: 0,
+      };
+    }
+  },
+
+  // ✅ FUNGSI BARU: Performance Stats untuk Grafik
+  getPerformance: async () => {
+    try {
+      console.log("📊 Fetching performance stats...");
+      const res = await apiClient.get("/stats/performance");
+      console.log("✅ Performance stats loaded:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error fetching performance stats:", error);
+      // Return structure kosong jika gagal
+      return {
+        summary: {
+          totalRecords: 0,
+          averageScore: 0,
+          latestPeriod: "N/A",
+        },
+        distribution: {
+          excellent: 0,
+          good: 0,
+          average: 0,
+          poor: 0,
+        },
+        byRole: [],
+        trend: [],
+        topPerformers: [],
       };
     }
   },

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react"; // ⭐ Tambahkan useCallback
-import * as api from "../services/api"; // Diperlukan untuk getCurrentUser()
-import { employee, performance } from "../services/api"; // ⭐ IMPORT YANG BENAR (employee & performance)
+import { useCallback, useEffect, useState } from "react";
+import * as api from "../services/api";
+import { employee, performance } from "../services/api";
 
 // --- Inline Styles untuk Kerapian dan Konsistensi ---
 const styles = {
@@ -52,6 +52,27 @@ const styles = {
     fontSize: "1rem",
     marginTop: "0.8rem",
   },
+  btnEdit: {
+    backgroundColor: "#FFA500",
+    color: "#fff",
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    fontWeight: "500",
+    cursor: "pointer",
+    border: "none",
+    fontSize: "0.85rem",
+    marginRight: "0.5rem",
+  },
+  btnDelete: {
+    backgroundColor: "#FF4444",
+    color: "#fff",
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    fontWeight: "500",
+    cursor: "pointer",
+    border: "none",
+    fontSize: "0.85rem",
+  },
   infoBoxHR: {
     backgroundColor: "#3A4068",
     border: "1px solid #00BCD4",
@@ -82,31 +103,31 @@ const getScoreColor = (nilai) => {
   if (nilai >= 65) return "#FFD700"; // Kuning (Baik)
   return "#FF6347"; // Merah (Perlu Perbaikan)
 };
-// --- End Inline Styles ---
 
 export default function Performance() {
-  const [employeesData, setEmployeesData] = useState([]); // ⭐ Ganti employees -> employeesData
+  const [employeesData, setEmployeesData] = useState([]);
   const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true); // ⭐ LOADING STATE
-  const [error, setError] = useState(null); // ⭐ ERROR STATE
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [form, setForm] = useState({
     employee_id: "",
     periode: "2025-Q3",
     nilai_kinerja: 0,
     catatan: "",
   });
+  const [editMode, setEditMode] = useState(false);
+  const [editId, setEditId] = useState(null);
 
   const currentUser = api.getCurrentUser();
   const isHR = currentUser?.role === "HR";
   const isAdmin = currentUser?.role === "Admin";
   const canInput = isAdmin;
 
-  // ⭐ FUNGSI REFRESH ASYNCHRONOUS
+  // FUNGSI REFRESH
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // ⭐ Gunakan employee.findAll() dan performance.findAll()
       const empData = await employee.findAll();
       const perfData = await performance.findAll();
 
@@ -124,8 +145,8 @@ export default function Performance() {
     refresh();
   }, [refresh]);
 
+  // FUNGSI SUBMIT (CREATE/UPDATE)
   const submit = async (e) => {
-    // ⭐ Jadikan async
     e.preventDefault();
 
     if (!canInput) {
@@ -141,8 +162,18 @@ export default function Performance() {
     }
 
     try {
-      await performance.create(form); // ⭐ Gunakan performance.create()
-      alert("Data kinerja berhasil disimpan!");
+      if (editMode) {
+        // UPDATE
+        await performance.update(editId, form);
+        alert("Data kinerja berhasil diperbarui!");
+        setEditMode(false);
+        setEditId(null);
+      } else {
+        // CREATE
+        await performance.create(form);
+        alert("Data kinerja berhasil disimpan!");
+      }
+
       refresh();
       setForm({
         employee_id: "",
@@ -154,6 +185,53 @@ export default function Performance() {
       setError(e.message || "Gagal menyimpan data kinerja.");
       alert("Gagal menyimpan data kinerja: " + e.message);
     }
+  };
+
+  // FUNGSI EDIT
+  const handleEdit = (p) => {
+    setEditMode(true);
+    setEditId(p.performance_id);
+    setForm({
+      employee_id: p.employee_id.toString(),
+      periode: p.periode,
+      nilai_kinerja: p.nilai_kinerja,
+      catatan: p.catatan || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // FUNGSI DELETE
+  const handleDelete = async (id) => {
+    if (!canInput) {
+      alert("Anda tidak memiliki akses untuk menghapus data kinerja.");
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      "Apakah Anda yakin ingin menghapus data kinerja ini?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      await performance.delete(id);
+      alert("Data kinerja berhasil dihapus!");
+      refresh();
+    } catch (e) {
+      alert("Gagal menghapus data kinerja: " + e.message);
+    }
+  };
+
+  // FUNGSI CANCEL EDIT
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setEditId(null);
+    setForm({
+      employee_id: "",
+      periode: "2025-Q3",
+      nilai_kinerja: 0,
+      catatan: "",
+    });
   };
 
   // Tampilkan Loading/Error
@@ -210,17 +288,14 @@ export default function Performance() {
                 setForm({ ...form, employee_id: e.target.value })
               }
               required
+              disabled={editMode}
             >
               <option value="">- pilih -</option>
-              {employeesData.map(
-                (
-                  e // ⭐ Ganti employees -> employeesData
-                ) => (
-                  <option key={e.employee_id} value={e.employee_id}>
-                    {e.nama_lengkap}
-                  </option>
-                )
-              )}
+              {employeesData.map((e) => (
+                <option key={e.employee_id} value={e.employee_id}>
+                  {e.nama_lengkap}
+                </option>
+              ))}
             </select>
           </div>
           <div style={styles.formElement}>
@@ -245,7 +320,7 @@ export default function Performance() {
             />
           </div>
 
-          {/* Row 2: Catatan dan Tombol Simpan */}
+          {/* Row 2: Catatan dan Tombol */}
           <div style={{ ...styles.formElement, gridColumn: "1 / 3" }}>
             <label style={styles.label}>Catatan</label>
             <textarea
@@ -261,11 +336,21 @@ export default function Performance() {
               flexDirection: "row",
               alignItems: "flex-end",
               justifyContent: "flex-start",
+              gap: "0.5rem",
             }}
           >
             <button style={styles.btnPrimary} type="submit">
-              Simpan
+              {editMode ? "Update" : "Simpan"}
             </button>
+            {editMode && (
+              <button
+                style={{ ...styles.btnPrimary, backgroundColor: "#6c757d" }}
+                type="button"
+                onClick={handleCancelEdit}
+              >
+                Batal
+              </button>
+            )}
           </div>
         </form>
       )}
@@ -287,24 +372,21 @@ export default function Performance() {
             <tr>
               <th style={styles.th}>Periode</th>
               <th style={styles.th}>Nama</th>
-              <th style={styles.th}>Role</th>{" "}
-              {/* Kolom Role telah ditambahkan */}
+              <th style={styles.th}>Role</th>
               <th style={styles.th}>Nilai</th>
               <th style={styles.th}>Catatan</th>
+              {canInput && <th style={styles.th}>Aksi</th>}
             </tr>
           </thead>
           <tbody>
             {list.map((p) => {
-              // ⭐ Gunakan employeesData
               const emp = employeesData.find(
                 (ed) => ed.employee_id === p.employee_id
               );
 
-              // Tentukan nama dan role dengan fallback
               const employeeName =
                 emp?.nama_lengkap || p.employee?.nama_lengkap || p.employee_id;
 
-              // ⭐ PRIORITAS: Ambil role dari employee.user.role (data terbaru dari Users table)
               const employeeRole =
                 p.employee?.user?.role || p.role || emp?.user?.role || "-";
 
@@ -315,8 +397,7 @@ export default function Performance() {
                 >
                   <td style={styles.td}>{p.periode}</td>
                   <td style={styles.td}>{employeeName}</td>
-                  <td style={styles.td}>{employeeRole}</td>{" "}
-                  {/* Kolom Role yang sudah diisi */}
+                  <td style={styles.td}>{employeeRole}</td>
                   <td
                     style={{
                       ...styles.td,
@@ -335,13 +416,29 @@ export default function Performance() {
                   >
                     {p.catatan}
                   </td>
+                  {canInput && (
+                    <td style={styles.td}>
+                      <button
+                        style={styles.btnEdit}
+                        onClick={() => handleEdit(p)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        style={styles.btnDelete}
+                        onClick={() => handleDelete(p.performance_id)}
+                      >
+                        Hapus
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
             {list.length === 0 && (
               <tr>
                 <td
-                  colSpan="5"
+                  colSpan={canInput ? "6" : "5"}
                   style={{
                     ...styles.td,
                     textAlign: "center",

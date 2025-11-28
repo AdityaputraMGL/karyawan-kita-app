@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AddEmployee from "./components/AddEmployee";
 import AdminDashboard from "./components/AdminDashboard";
+import AlphaManagement from "./components/AlphaManagement";
 import ApprovalManagement from "./components/ApprovalManagement";
 import Attendance from "./components/Attendance";
 import EmployeeDashboard from "./components/EmployeeDashboard";
@@ -83,6 +84,10 @@ export default function App() {
             <Route path="/leave" element={<Leave />} />{" "}
             {/* Performance/Talenta: Admin & HR */}{" "}
             <Route path="/performance" element={<Performance />} />             {" "}
+          </Route>
+          {/* ⭐ NEW: Alpha Management: Admin & HR only */}
+          <Route element={<RequireRole allow={["Admin", "HR"]} />}>
+            <Route path="/alpha" element={<AlphaManagement />} />
           </Route>
                    {" "}
           <Route

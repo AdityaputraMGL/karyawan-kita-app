@@ -29,7 +29,7 @@ export default function Dashboard() {
     calculateStats();
   }, [user.role, loggedInEmployeeId]);
 
-  // ✅ PERBAIKAN: Tambahkan async dan await
+  // ✅ PERBAIKAN: Tambahkan async dan await + fetch quota dari API
   const calculateStats = async () => {
     try {
       setLoading(true);
@@ -54,11 +54,63 @@ export default function Dashboard() {
         (a) => a.status === "hadir"
       ).length;
 
-      const approvedLeave = myLeave.filter(
-        (l) => l.status === "approved" && l.jenis_pengajuan === "Cuti"
-      );
-      const cutiDigunakan = approvedLeave.length;
-      const sisaCuti = 12 - cutiDigunakan;
+      // ⭐ FETCH KUOTA CUTI DARI API (untuk karyawan)
+      let sisaCuti = 12;
+      let cutiDigunakan = 0;
+
+      if (isEmployee) {
+        try {
+          const quotaResponse = await fetch(
+            "http://localhost:5000/api/leave/quota",
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("hr_userToken")}`,
+              },
+            }
+          );
+
+          if (quotaResponse.ok) {
+            const quotaData = await quotaResponse.json();
+            console.log("✅ Quota data loaded:", quotaData);
+            sisaCuti = quotaData.remaining_days;
+            cutiDigunakan = quotaData.used_days;
+          } else {
+            console.error(
+              "❌ Failed to fetch quota, using fallback calculation"
+            );
+            // Fallback: hitung manual berdasarkan total_days
+            const approvedLeave = myLeave.filter(
+              (l) => l.status === "approved" && l.jenis_pengajuan === "Cuti"
+            );
+            cutiDigunakan = approvedLeave.reduce(
+              (sum, l) => sum + (l.total_days || 1),
+              0
+            );
+            sisaCuti = 12 - cutiDigunakan;
+          }
+        } catch (error) {
+          console.error("❌ Error fetching quota:", error);
+          // Fallback: hitung manual berdasarkan total_days
+          const approvedLeave = myLeave.filter(
+            (l) => l.status === "approved" && l.jenis_pengajuan === "Cuti"
+          );
+          cutiDigunakan = approvedLeave.reduce(
+            (sum, l) => sum + (l.total_days || 1),
+            0
+          );
+          sisaCuti = 12 - cutiDigunakan;
+        }
+      } else {
+        // Untuk Admin/HR, gunakan perhitungan manual berdasarkan total_days
+        const approvedLeave = myLeave.filter(
+          (l) => l.status === "approved" && l.jenis_pengajuan === "Cuti"
+        );
+        cutiDigunakan = approvedLeave.reduce(
+          (sum, l) => sum + (l.total_days || 1),
+          0
+        );
+        sisaCuti = 12 - cutiDigunakan;
+      }
 
       // Pending approval (absensi WFH/Hybrid + cuti pending)
       const pendingAttendance = myAttendance.filter(
@@ -268,7 +320,7 @@ export default function Dashboard() {
         <div style={styles.statCard("#FF6384")}>
           <div style={styles.cardValue}>{stats.sisaCuti}</div>
           <div style={styles.cardTitle}>
-            Sisa Cuti ({stats.cutiDigunakan} digunakan)
+            Sisa Cuti ({stats.cutiDigunakan} hari digunakan)
           </div>
         </div>
 

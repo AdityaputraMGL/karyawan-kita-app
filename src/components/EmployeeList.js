@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react"; // ⭐ Tambahkan useCallback
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { employee } from "../services/api"; // ⭐ IMPORT YANG BENAR: employee (singular)
+import { employee } from "../services/api";
 
 // --- Inline Styles untuk Kerapian dan Ukuran Ramping ---
 const styles = {
@@ -13,7 +13,7 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "1.5rem", // Jarak ke Card
+    marginBottom: "1.5rem",
   },
   // Style untuk Judul Halaman
   title: {
@@ -25,7 +25,7 @@ const styles = {
   actions: {
     display: "flex",
     alignItems: "center",
-    gap: "1rem", // Jarak antar elemen aksi
+    gap: "1rem",
   },
   // Style untuk Search Input
   input: {
@@ -50,6 +50,7 @@ const styles = {
   btnSecondary: {
     backgroundColor: "#3A4068",
     color: "#fff",
+    transition: "all 0.2s ease",
   },
   // Style untuk Tombol Primary (Tambah)
   btnPrimary: {
@@ -61,26 +62,28 @@ const styles = {
     backgroundColor: "#2C3150",
     borderRadius: "12px",
     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
-    padding: "0", // Penting: Hapus padding di card agar tabel menempel
-    overflowX: "auto", // Agar tabel bisa di-scroll jika terlalu lebar
+    padding: "0",
+    overflowX: "auto",
   },
   // Style untuk Tabel
   table: {
     width: "100%",
     borderCollapse: "collapse",
     color: "white",
+    tableLayout: "fixed",
   },
   // Style untuk Header Tabel (thead)
   tableHeader: {
-    backgroundColor: "#3A4068", // Latar belakang header lebih kontras
+    backgroundColor: "#3A4068",
     textAlign: "left",
   },
   // Style untuk sel Header
   th: {
-    padding: "1rem 1.5rem", // Padding header seragam
+    padding: "1rem 1.5rem",
     fontSize: "0.95rem",
     fontWeight: "600",
     color: "rgba(255, 255, 255, 0.8)",
+    whiteSpace: "nowrap",
   },
   // Style untuk baris Body
   tr: {
@@ -93,26 +96,69 @@ const styles = {
   },
   // Style untuk sel Body
   td: {
-    padding: "1rem 1.5rem", // Padding body seragam
+    padding: "1rem 1.5rem",
     fontSize: "0.9rem",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   // Style untuk Tombol Aksi di dalam tabel
   actionCell: {
     display: "flex",
-    gap: "0.5rem", // Jarak antar tombol Edit/Hapus
+    gap: "0.6rem",
     alignItems: "center",
+    justifyContent: "flex-start",
+    whiteSpace: "nowrap",
   },
   // Style untuk Tombol Danger (Hapus)
   btnDanger: {
     backgroundColor: "#FF6347",
     color: "white",
+    transition: "all 0.2s ease",
+  },
+  // Style untuk tombol aksi kecil di tabel
+  btnActionSmall: {
+    padding: "0.5rem 1rem",
+    fontSize: "0.85rem",
+    minWidth: "70px",
+    textAlign: "center",
+    whiteSpace: "nowrap",
+  },
+  // Style untuk kolom dengan width spesifik
+  colID: {
+    width: "60px",
+  },
+  colNama: {
+    width: "150px",
+  },
+  colJabatan: {
+    width: "120px",
+  },
+  colAlamat: {
+    width: "200px",
+    maxWidth: "200px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  colNoHP: {
+    width: "130px",
+  },
+  colStatus: {
+    width: "100px",
+  },
+  colMasuk: {
+    width: "180px",
+  },
+  colAksi: {
+    width: "180px",
+    minWidth: "180px",
   },
 };
 // --- End Inline Styles ---
 
 export default function EmployeeList() {
   const [list, setList] = useState([]);
-  const [q, setQ] = useState(""); // State untuk Query (Pencarian)
+  const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -123,7 +169,6 @@ export default function EmployeeList() {
     setLoading(true);
     setError(null);
     try {
-      // ⭐ Menggunakan employee.findAll() dari API Axios yang baru
       const data = await employee.findAll(q);
       setList(data);
     } catch (e) {
@@ -132,7 +177,7 @@ export default function EmployeeList() {
     } finally {
       setLoading(false);
     }
-  }, [q]); // Refresh saat q berubah
+  }, [q]);
 
   useEffect(() => {
     refresh();
@@ -142,8 +187,8 @@ export default function EmployeeList() {
   const del = async (id) => {
     if (!window.confirm("Hapus karyawan ini?")) return;
     try {
-      await employee.delete(id); // ⭐ Menggunakan employee.delete()
-      refresh(); // Muat ulang data setelah berhasil dihapus
+      await employee.delete(id);
+      refresh();
     } catch (e) {
       setError(e.message || "Gagal menghapus karyawan.");
       console.error("Gagal menghapus karyawan:", e);
@@ -151,18 +196,18 @@ export default function EmployeeList() {
   };
 
   const exportCSV = async () => {
-    // ⭐ Jadikan async
     try {
-      // ⭐ Menggunakan employee.findAll()
       const allEmployees = await employee.findAll();
 
+      // ⭐ TAMBAHKAN ALAMAT DAN NO HP KE EXPORT CSV
       const rows = allEmployees.map((e) => ({
         employee_id: e.employee_id,
         nama_lengkap: e.nama_lengkap,
         jabatan: e.jabatan,
+        alamat: e.alamat, // ⭐ TAMBAH ALAMAT
+        no_hp: e.no_hp, // ⭐ TAMBAH NO HP
         tanggal_masuk: e.tanggal_masuk,
         status_karyawan: e.status_karyawan,
-        no_hp: e.no_hp,
       }));
 
       const header = Object.keys(rows[0] || {}).join(",");
@@ -254,12 +299,14 @@ export default function EmployeeList() {
         <table style={styles.table}>
           <thead style={styles.tableHeader}>
             <tr>
-              <th style={styles.th}>ID</th>
-              <th style={styles.th}>Nama</th>
-              <th style={styles.th}>Jabatan</th>
-              <th style={styles.th}>Status</th>
-              <th style={styles.th}>Masuk</th>
-              <th style={styles.th}>Aksi</th>
+              <th style={{ ...styles.th, ...styles.colID }}>ID</th>
+              <th style={{ ...styles.th, ...styles.colNama }}>Nama</th>
+              <th style={{ ...styles.th, ...styles.colJabatan }}>Jabatan</th>
+              <th style={{ ...styles.th, ...styles.colAlamat }}>Alamat</th>
+              <th style={{ ...styles.th, ...styles.colNoHP }}>No HP</th>
+              <th style={{ ...styles.th, ...styles.colStatus }}>Status</th>
+              <th style={{ ...styles.th, ...styles.colMasuk }}>Masuk</th>
+              <th style={{ ...styles.th, ...styles.colAksi }}>Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -273,26 +320,59 @@ export default function EmployeeList() {
                 onMouseEnter={() => setHoveredRow(e.employee_id)}
                 onMouseLeave={() => setHoveredRow(null)}
               >
-                <td style={styles.td}>{e.employee_id}</td>
-                <td style={styles.td}>
+                <td style={{ ...styles.td, ...styles.colID }}>
+                  {e.employee_id}
+                </td>
+                <td style={{ ...styles.td, ...styles.colNama }}>
                   <Link
                     to={`/employee/${e.employee_id}`}
                     style={{ color: "#cfd3cfff", textDecoration: "none" }}
+                    title={e.nama_lengkap}
                   >
                     {e.nama_lengkap}
                   </Link>
                 </td>
-                <td style={styles.td}>{e.jabatan}</td>
-                <td style={styles.td}>{e.status_karyawan}</td>
-                <td style={styles.td}>{e.tanggal_masuk}</td>
-                <td style={{ ...styles.td, ...styles.actionCell }}>
+                <td
+                  style={{ ...styles.td, ...styles.colJabatan }}
+                  title={e.jabatan || "-"}
+                >
+                  {e.jabatan || "-"}
+                </td>
+                <td
+                  style={{ ...styles.td, ...styles.colAlamat }}
+                  title={e.alamat || "-"}
+                >
+                  {e.alamat || "-"}
+                </td>
+                <td style={{ ...styles.td, ...styles.colNoHP }}>
+                  {e.no_hp || "-"}
+                </td>
+                <td style={{ ...styles.td, ...styles.colStatus }}>
+                  {e.status_karyawan}
+                </td>
+                <td style={{ ...styles.td, ...styles.colMasuk }}>
+                  {e.tanggal_masuk}
+                </td>
+                <td
+                  style={{
+                    ...styles.td,
+                    ...styles.actionCell,
+                    ...styles.colAksi,
+                  }}
+                >
                   <button
                     style={{
                       ...styles.btn,
                       ...styles.btnSecondary,
-                      padding: "0.4rem 0.8rem",
+                      ...styles.btnActionSmall,
                     }}
                     onClick={() => navigate(`/employee/${e.employee_id}`)}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = "#4A5078";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = "#3A4068";
+                    }}
                   >
                     Edit
                   </button>
@@ -300,9 +380,15 @@ export default function EmployeeList() {
                     style={{
                       ...styles.btn,
                       ...styles.btnDanger,
-                      padding: "0.4rem 0.8rem",
+                      ...styles.btnActionSmall,
                     }}
                     onClick={() => del(e.employee_id)}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = "#FF4534";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = "#FF6347";
+                    }}
                   >
                     Hapus
                   </button>
@@ -311,7 +397,7 @@ export default function EmployeeList() {
             ))}
             {list.length === 0 && (
               <tr>
-                <td colSpan="6" style={{ ...styles.td, textAlign: "center" }}>
+                <td colSpan="8" style={{ ...styles.td, textAlign: "center" }}>
                   <i>Tidak ada data.</i>
                 </td>
               </tr>
