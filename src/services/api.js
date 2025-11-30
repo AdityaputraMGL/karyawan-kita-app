@@ -171,6 +171,12 @@ export async function register(payload) {
   }
 }
 
+export function loginWithGoogle() {
+  console.log("🔄 Redirecting to Google OAuth...");
+  // Redirect ke backend Google OAuth endpoint
+  window.location.href = `${API_BASE_URL}/auth/google`;
+}
+
 export function getCurrentUser() {
   const user = localStorage.getItem(LS.currentUser);
   return user ? JSON.parse(user) : null;

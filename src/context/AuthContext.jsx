@@ -15,6 +15,10 @@ export function AuthProvider({ children }) {
     return u;
   };
 
+  const loginWithGoogle = () => {
+    api.loginWithGoogle();
+  };
+
   // ✅ Register
   const register = async (payload) => {
     const u = await api.register(payload);
@@ -70,6 +74,7 @@ export function AuthProvider({ children }) {
       register,
       forgotPassword,
       resetPassword,
+      loginWithGoogle,
       fixEmployee, // ✅ Export fixEmployee
       logout,
       hasRole,

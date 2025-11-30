@@ -7,6 +7,7 @@ import Attendance from "./components/Attendance";
 import EmployeeDashboard from "./components/EmployeeDashboard";
 import EmployeeDetail from "./components/EmployeeDetail";
 import EmployeeList from "./components/EmployeeList";
+import GoogleCallback from "./components/GoogleCallback";
 import Leave from "./components/Leave";
 import Login from "./components/Login";
 import Navbar from "./components/Navbar";
@@ -85,6 +86,7 @@ export default function App() {
             {/* Performance/Talenta: Admin & HR */}{" "}
             <Route path="/performance" element={<Performance />} />             {" "}
           </Route>
+          <Route path="/auth/callback" element={<GoogleCallback />} />
           {/* ⭐ NEW: Alpha Management: Admin & HR only */}
           <Route element={<RequireRole allow={["Admin", "HR"]} />}>
             <Route path="/alpha" element={<AlphaManagement />} />
