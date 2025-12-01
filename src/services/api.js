@@ -321,6 +321,22 @@ export const employee = {
       throw new Error(errorMsg);
     }
   },
+  // ✅ TAMBAHKAN FUNGSI INI
+  completeProfile: async (payload) => {
+    try {
+      console.log("📤 Completing profile:", payload);
+      const res = await apiClient.put("/employees/complete-profile", payload);
+      console.log("✅ Profile completed:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error completing profile:", error);
+      const errorMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Gagal melengkapi profil.";
+      throw new Error(errorMsg);
+    }
+  },
 };
 
 // ATTENDANCE

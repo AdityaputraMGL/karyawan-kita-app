@@ -4,6 +4,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import AlphaManagement from "./components/AlphaManagement";
 import ApprovalManagement from "./components/ApprovalManagement";
 import Attendance from "./components/Attendance";
+import CompleteProfile from "./components/CompleteProfile";
 import EmployeeDashboard from "./components/EmployeeDashboard";
 import EmployeeDetail from "./components/EmployeeDetail";
 import EmployeeList from "./components/EmployeeList";
@@ -44,22 +45,22 @@ export default function App() {
       <div style={styles.contentContainer}>
                {" "}
         <Routes>
-                   {" "}
           <Route
             path="/"
             element={user ? <Navigate to="/dashboard" /> : <Login />}
           />
-                   {" "}
+          {/* ✅✅✅ DUA ROUTE INI HARUS SEBELUM ProtectedRoute ✅✅✅ */}
+          <Route path="/auth/callback" element={<GoogleCallback />} />
+          <Route path="/complete-profile" element={<CompleteProfile />} />
+          {/* ✅ BARU MULAI ROUTE YANG BUTUH AUTH */}
           <Route element={<ProtectedRoute />}>
-                       {" "}
             <Route
               path="/dashboard"
               element={
-                // ⭐ PERUBAHAN DI SINI: Hanya Admin yang melihat AdminDashboard
                 user?.role === "Admin" ? (
                   <AdminDashboard />
                 ) : (
-                  <EmployeeDashboard /> // HR dan Karyawan akan melihat EmployeeDashboard
+                  <EmployeeDashboard />
                 )
               }
             />
@@ -86,7 +87,6 @@ export default function App() {
             {/* Performance/Talenta: Admin & HR */}{" "}
             <Route path="/performance" element={<Performance />} />             {" "}
           </Route>
-          <Route path="/auth/callback" element={<GoogleCallback />} />
           {/* ⭐ NEW: Alpha Management: Admin & HR only */}
           <Route element={<RequireRole allow={["Admin", "HR"]} />}>
             <Route path="/alpha" element={<AlphaManagement />} />

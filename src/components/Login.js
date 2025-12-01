@@ -38,7 +38,6 @@ export default function Login() {
   const [showRegisterPass, setShowRegisterPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
 
-  // --- FUNGSI LOGIN/REGISTER/ETC ---
   const onLogin = async (e) => {
     e.preventDefault();
     setErr("");
@@ -48,7 +47,14 @@ export default function Login() {
       await login(username.trim(), password);
       navigate("/dashboard");
     } catch (e) {
-      setErr(e.message || "Login gagal");
+      // ✅ Handle error password belum di-set
+      if (e.response?.data?.code === "PASSWORD_NOT_SET") {
+        setErr(
+          "Anda belum mengatur password. Silakan gunakan 'Login dengan Google' atau lengkapi profil terlebih dahulu."
+        );
+      } else {
+        setErr(e.response?.data?.error || e.message || "Login gagal");
+      }
     } finally {
       setLoading(false);
     }
@@ -145,20 +151,6 @@ export default function Login() {
         e.message ||
         "Gagal mereset password. Token mungkin tidak valid atau sudah expired.";
       setErr(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onGoogleRegister = async () => {
-    setErr("");
-    setSuccess("");
-    setLoading(true);
-    try {
-      await loginWithGoogle();
-      navigate("/dashboard");
-    } catch (e) {
-      setErr(e.message || "Pendaftaran dengan Google gagal");
     } finally {
       setLoading(false);
     }
@@ -558,18 +550,35 @@ export default function Login() {
                   </button>
                 </div>
               </div>
-            </form>
-          )}
+              {/* Divider */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  margin: "20px 0 16px 0",
+                }}
+              >
+                <div
+                  style={{ flex: 1, height: "1px", background: "#e0e0e0" }}
+                />
+                <span
+                  style={{ color: "#999", fontSize: "13px", fontWeight: "500" }}
+                >
+                  Atau
+                </span>
+                <div
+                  style={{ flex: 1, height: "1px", background: "#e0e0e0" }}
+                />
+              </div>
 
-          {/* REGISTER FORM */}
-          {tab === "register" && (
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-            >
-              {/* Google Register Button - DI ATAS */}
+              {/* Google Login Button */}
               <button
                 type="button"
-                onClick={onGoogleRegister}
+                onClick={() => {
+                  window.location.href =
+                    "http://localhost:5000/api/auth/google";
+                }}
                 disabled={loading}
                 style={{
                   width: "100%",
@@ -603,29 +612,18 @@ export default function Login() {
                 }}
               >
                 <GoogleIcon />
-                {loading ? "Memproses..." : "Daftar dengan Google"}
+                Masuk dengan Google
               </button>
 
-              {/* Divider */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  margin: "0",
-                }}
-              >
-                <div
-                  style={{ flex: 1, height: "1px", background: "#e0e0e0" }}
-                />
-                <span style={{ color: "#999", fontSize: "13px" }}>
-                  atau daftar dengan email
-                </span>
-                <div
-                  style={{ flex: 1, height: "1px", background: "#e0e0e0" }}
-                />
-              </div>
+              {/* ✅✅✅ AKHIR KODE BARU ✅✅✅ */}
+            </form>
+          )}
 
+          {/* REGISTER FORM */}
+          {tab === "register" && (
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+            >
               <form
                 onSubmit={onRegister}
                 style={{
@@ -979,6 +977,68 @@ export default function Login() {
                 >
                   {loading ? "Memproses..." : "🚀 Daftar Sekarang"}
                 </button>
+                {/* Google Register Button - DI ATAS */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href =
+                      "http://localhost:5000/api/auth/google";
+                  }}
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    padding: "16px",
+                    background: "white",
+                    color: "#333",
+                    border: "1px solid #e0e0e0",
+                    borderRadius: "10px",
+                    fontSize: "15px",
+                    fontWeight: "600",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    transition: "all 0.3s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "12px",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.background = "#fafafa";
+                      e.target.style.borderColor = "#5C54A4";
+                      e.target.style.boxShadow =
+                        "0 4px 12px rgba(92, 84, 164, 0.15)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = "white";
+                    e.target.style.borderColor = "#e0e0e0";
+                    e.target.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)";
+                  }}
+                >
+                  <GoogleIcon />
+                  {loading ? "Memproses..." : "Daftar dengan Google"}
+                </button>
+
+                {/* Divider */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    margin: "0",
+                  }}
+                >
+                  <div
+                    style={{ flex: 1, height: "1px", background: "#e0e0e0" }}
+                  />
+                  <span style={{ color: "#999", fontSize: "13px" }}>
+                    atau daftar dengan email
+                  </span>
+                  <div
+                    style={{ flex: 1, height: "1px", background: "#e0e0e0" }}
+                  />
+                </div>
               </form>
             </div>
           )}
