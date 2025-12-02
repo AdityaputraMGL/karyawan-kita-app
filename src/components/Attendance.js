@@ -180,6 +180,10 @@ export default function Attendance() {
     tipe_kerja: "WFO (Work From Office)",
   });
 
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toISOString().slice(0, 7) // format: "2024-12"
+  );
+
   const [wfhRequestForm, setWfhRequestForm] = useState({
     tanggal: new Date().toISOString().split("T")[0],
     tipe_kerja: "WFH (Work From Home)",
@@ -203,6 +207,31 @@ export default function Attendance() {
     },
     [loggedInEmployeeId]
   );
+
+  const getFilteredList = useCallback(() => {
+    if (!selectedMonth) return list;
+
+    return list.filter((a) => {
+      const attendanceMonth = a.tanggal.slice(0, 7); // ambil "YYYY-MM"
+      return attendanceMonth === selectedMonth;
+    });
+  }, [list, selectedMonth]);
+
+  const getMonthlyStats = useCallback(() => {
+    const filtered = getFilteredList();
+    const hadirCount = filtered.filter((a) => a.status === "hadir").length;
+    const izinCount = filtered.filter((a) => a.status === "izin").length;
+    const sakitCount = filtered.filter((a) => a.status === "sakit").length;
+    const alpaCount = filtered.filter((a) => a.status === "alpa").length;
+
+    return {
+      total: filtered.length,
+      hadir: hadirCount,
+      izin: izinCount,
+      sakit: sakitCount,
+      alpa: alpaCount,
+    };
+  }, [getFilteredList]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -705,6 +734,131 @@ export default function Attendance() {
       `}</style>
 
       <h1 style={styles.title}>Absensi</h1>
+
+      <div style={styles.card}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            marginBottom: "0.5rem",
+          }}
+        >
+          <label style={styles.label}>Filter Bulan:</label>
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            style={{ ...styles.inputField, width: "200px" }}
+          />
+          <button
+            onClick={() =>
+              setSelectedMonth(new Date().toISOString().slice(0, 7))
+            }
+            style={{ ...styles.btnPrimary, padding: "0.5rem 1rem" }}
+          >
+            Bulan Ini
+          </button>
+        </div>
+
+        {(() => {
+          const stats = getMonthlyStats();
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "1rem",
+                marginTop: "1rem",
+                padding: "1rem",
+                backgroundColor: "#3A4068",
+                borderRadius: "8px",
+              }}
+            >
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#4CAF50",
+                  }}
+                >
+                  {stats.total}
+                </div>
+                <div
+                  style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Total Absen
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#2196F3",
+                  }}
+                >
+                  {stats.hadir}
+                </div>
+                <div
+                  style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Hadir
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#FF9800",
+                  }}
+                >
+                  {stats.izin}
+                </div>
+                <div
+                  style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Izin
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#9C27B0",
+                  }}
+                >
+                  {stats.sakit}
+                </div>
+                <div
+                  style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Sakit
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#f44336",
+                  }}
+                >
+                  {stats.alpa}
+                </div>
+                <div
+                  style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Alpa
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
 
       {!isAdmin && (
         <div style={styles.quickAbsenCard}>
@@ -1301,7 +1455,7 @@ export default function Attendance() {
             </tr>
           </thead>
           <tbody>
-            {list.map((a) => {
+            {getFilteredList().map((a) => {
               const emp = canSeeAllData
                 ? findEmployeeById(a.employee_id)
                 : user;
@@ -1370,7 +1524,7 @@ export default function Attendance() {
                 </tr>
               );
             })}
-            {list.length === 0 && (
+            {getFilteredList().length === 0 && (
               <tr>
                 <td
                   colSpan={canSeeAllData ? "9" : "6"}
