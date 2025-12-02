@@ -203,7 +203,7 @@ export async function fixEmployee() {
     const res = await apiClient.post("/users/fix-employee");
     console.log("✅ Fix employee response:", res.data);
 
-    const { token, employee_id, message } = res.data;
+    const { token, employee_id } = res.data;
 
     // Update token jika ada token baru
     if (token) {
@@ -241,6 +241,70 @@ const ensureArray = (data) => {
   }
   return [];
 };
+// ✅ Get User Profile
+export async function getUserProfile() {
+  const token = localStorage.getItem("hr_userToken");
+  if (!token) throw new Error("Token tidak ditemukan");
+
+  const res = await fetch(`${API_BASE_URL}/users/profile`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Gagal memuat profil");
+  }
+
+  return res.json();
+}
+
+// ✅ Update User Profile
+export async function updateUserProfile(profileData) {
+  const token = localStorage.getItem("hr_userToken");
+  if (!token) throw new Error("Token tidak ditemukan");
+
+  const res = await fetch(`${API_BASE_URL}/users/profile`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(profileData),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Gagal memperbarui profil");
+  }
+
+  return res.json();
+}
+
+// ✅ Change Password
+export async function changePassword(oldPassword, newPassword) {
+  const token = localStorage.getItem("hr_userToken");
+  if (!token) throw new Error("Token tidak ditemukan");
+
+  const res = await fetch(`${API_BASE_URL}/users/change-password`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Gagal mengubah password");
+  }
+
+  return res.json();
+}
 
 // -----------------------------------------------------------
 // 3. FUNGSI API LAINNYA

@@ -129,7 +129,6 @@ const icons = {
       <polyline points="17 6 23 6 23 12"></polyline>
     </svg>
   ),
-  // ⭐ NEW: Clock icon untuk Approvals
   clock: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -146,8 +145,6 @@ const icons = {
       <polyline points="12 6 12 12 16 14"></polyline>
     </svg>
   ),
-
-  // ⭐ NEW: Bot/Robot icon untuk Alpha Management
   bot: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -167,7 +164,23 @@ const icons = {
       <line x1="16" y1="16" x2="16" y2="16"></line>
     </svg>
   ),
-
+  // ⭐ NEW: Settings icon
+  settings: (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+  ),
   logout: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -187,7 +200,6 @@ const icons = {
   ),
 };
 
-// --- Inline Styles yang Disesuaikan untuk Kerapian ---
 const styles = {
   sidebar: {
     width: SIDEBAR_WIDTH,
@@ -308,6 +320,7 @@ const styles = {
     justifyContent: "center",
     gap: "8px",
     transition: "all 0.3s ease",
+    marginBottom: "8px",
   },
   btnSecondaryHover: {
     backgroundColor: "rgba(102, 126, 234, 0.3)",
@@ -319,13 +332,13 @@ const styles = {
     flexShrink: 0,
   },
 };
-// --- End Inline Styles ---
 
 export default function Navbar() {
   const { user, logout, hasRole } = useAuth();
   const navigate = useNavigate();
 
   const [hoveredLink, setHoveredLink] = useState(null);
+  const [hoveredSettings, setHoveredSettings] = useState(false);
   const [hoveredLogout, setHoveredLogout] = useState(false);
 
   const handleLogout = () => {
@@ -333,7 +346,6 @@ export default function Navbar() {
     navigate("/");
   };
 
-  // Fungsi untuk mendapatkan gaya tautan (aktif dan hover)
   const getLinkStyle =
     (pathKey) =>
     ({ isActive }) => ({
@@ -352,7 +364,6 @@ export default function Navbar() {
       borderLeft: isActive ? "3px solid #667eea" : "3px solid transparent",
     });
 
-  // Fungsi untuk mendapatkan inisial user
   const getUserInitials = (username) => {
     if (!username) return "?";
     return username.substring(0, 2).toUpperCase();
@@ -403,7 +414,7 @@ export default function Navbar() {
           <span>Absensi</span>
         </NavLink>
 
-        {/* ⭐ NEW: Approvals (Hanya Admin & HR) */}
+        {/* Approvals (Hanya Admin & HR) */}
         {hasRole("Admin", "HR") && (
           <NavLink
             to="/approvals"
@@ -462,7 +473,7 @@ export default function Navbar() {
           <span>Talenta</span>
         </NavLink>
 
-        {/* ⭐ NEW: Alpha Management (Hanya Admin & HR) */}
+        {/* Alpha Management (Hanya Admin & HR) */}
         {hasRole("Admin", "HR") && (
           <NavLink
             to="/alpha"
@@ -476,7 +487,7 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* User Info dan Logout Section */}
+      {/* User Info dan Buttons Section */}
       <div style={styles.bottomSection}>
         <div style={styles.userInfo}>
           <div style={styles.avatar}>{getUserInitials(user?.username)}</div>
@@ -485,11 +496,28 @@ export default function Navbar() {
             <span style={styles.userRole}>{user?.role || "Role"}</span>
           </div>
         </div>
+
+        {/* ⭐ NEW: Settings Button */}
+        <button
+          onClick={() => navigate("/settings")}
+          style={{
+            ...styles.btnSecondary,
+            ...(hoveredSettings ? styles.btnSecondaryHover : {}),
+          }}
+          onMouseEnter={() => setHoveredSettings(true)}
+          onMouseLeave={() => setHoveredSettings(false)}
+        >
+          {icons.settings}
+          <span>Settings</span>
+        </button>
+
+        {/* Logout Button */}
         <button
           onClick={handleLogout}
           style={{
             ...styles.btnSecondary,
             ...(hoveredLogout ? styles.btnSecondaryHover : {}),
+            marginBottom: 0,
           }}
           onMouseEnter={() => setHoveredLogout(true)}
           onMouseLeave={() => setHoveredLogout(false)}

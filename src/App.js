@@ -17,6 +17,7 @@ import PaySlip from "./components/PaySlip";
 import Performance from "./components/Performance";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RequireRole from "./components/RequireRole";
+import Settings from "./components/Settings";
 import { useAuth } from "./context/AuthContext";
 
 // --- START: Inline Styles untuk Layout Sidebar ---
@@ -64,6 +65,8 @@ export default function App() {
                 )
               }
             />
+            {/* ⭐ NEW: Settings - Semua user bisa akses */}
+            <Route path="/settings" element={<Settings />} />
             {/* Data Karyawan: Admin & HR */}
             <Route element={<RequireRole allow={["Admin", "HR"]} />}>
               <Route path="/employees" element={<EmployeeList />} />
